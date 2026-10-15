@@ -23,6 +23,9 @@ services:
         generateValue: true
       - key: AUTH_COOKIE_SECURE
         value: "1"
+      # Temporary testing bypass: remove or set to "0" after account tests.
+      - key: AUTH_SKIP_EMAIL_ACTIVATION
+        value: "1"
       - key: DB_HOST
         sync: false
       - key: DB_NAME
