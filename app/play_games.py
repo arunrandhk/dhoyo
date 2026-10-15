@@ -11,11 +11,12 @@ import secrets
 import time
 from datetime import datetime, timezone
 from http.client import HTTPException
+from time import monotonic
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urlsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, has_request_context, jsonify, request
 
 from auth import COOKIE, current_user_id, digest
 from password_reset import setting
@@ -25,6 +26,8 @@ play_games = Blueprint('play_games', __name__, url_prefix='/api/play-games')
 TICKET_LIFETIME = 300
 RATE_WINDOW = 15 * 60
 MAX_ENTRIES = 2048
+REQUEST_BUDGET = 60
+PROVIDER_TIMEOUT = 10
 TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 GAMES_ENDPOINT = 'https://games.googleapis.com/games/v1/'
 INVALID_TICKET = 'This Play Games connection has expired or is invalid. Start again from your Dhoyo profile.'
@@ -42,6 +45,31 @@ GOOGLE_HTTP = build_opener(NoRedirect())
 
 class ProviderError(Exception):
     """A deliberately data-free error: provider bodies may contain credentials."""
+
+
+class DeadlineExceeded(ProviderError):
+    """The request may report completed work but must start no later updates."""
+
+
+def remaining_budget():
+    deadline = getattr(g, 'play_games_deadline', None) if has_request_context() else None
+    if deadline is None:
+        return PROVIDER_TIMEOUT
+    remaining = deadline - monotonic()
+    if remaining <= 0:
+        raise DeadlineExceeded()
+    return remaining
+
+
+def provider_call(endpoint, **kwargs):
+    # Keep the provider helper interface stable for synthetic providers while
+    # checking the total budget between every exchange, verification and update.
+    remaining_budget()
+    return google_json(endpoint, **kwargs)
+
+
+def timed_out():
+    return jsonify(error='Google Play Games took too long to verify this connection. Start again and try once more.'), 504
 
 
 def resource_id(value):
@@ -228,7 +256,7 @@ def google_json(endpoint, *, method='GET', access_token=None, form=None):
         encoded = b''
     provider_request = Request(endpoint, data=encoded, headers=headers, method=method)
     try:
-        with GOOGLE_HTTP.open(provider_request, timeout=10) as response:
+        with GOOGLE_HTTP.open(provider_request, timeout=min(PROVIDER_TIMEOUT, remaining_budget())) as response:
             if not 200 <= response.status < 300:
                 raise ProviderError()
             content = response.read(16385)
@@ -243,7 +271,7 @@ def google_json(endpoint, *, method='GET', access_token=None, form=None):
 
 
 def google_identity(configured, server_code):
-    token_result = google_json(TOKEN_ENDPOINT, method='POST', form=dict(
+    token_result = provider_call(TOKEN_ENDPOINT, method='POST', form=dict(
         client_id=configured['client_id'], client_secret=configured['client_secret'],
         code=server_code, grant_type='authorization_code', redirect_uri=''))
     access_token = token_result.get('access_token')
@@ -254,7 +282,7 @@ def google_identity(configured, server_code):
     # Discard refresh tokens immediately; linking alone does not authorise
     # background access. Every later sync needs explicit native authorisation.
     token_result.clear()
-    verified = google_json(GAMES_ENDPOINT + 'applications/' + configured['application_id'] + '/verify', access_token=access_token)
+    verified = provider_call(GAMES_ENDPOINT + 'applications/' + configured['application_id'] + '/verify', access_token=access_token)
     player_id = verified.get('player_id')
     if not isinstance(player_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,255}', player_id):
         raise ProviderError()
@@ -274,6 +302,9 @@ def sync_targets(data, user_id, configured):
 
 @play_games.post('/connect')
 def connect():
+    # One deadline covers request validation, shared-state work and all Google
+    # calls. Android and Gunicorn allow additional time to receive this result.
+    g.play_games_deadline = monotonic() + REQUEST_BUDGET
     from social import body, raw_state
     configured = settings()
     if configured is None:
@@ -299,9 +330,16 @@ def connect():
         user_id, session_digest = record['user_id'], record['session_digest']
     try:
         player_digest, access_token = google_identity(configured, server_code)
+        remaining_budget()
+    except DeadlineExceeded:
+        return timed_out()
     except ProviderError:
         return jsonify(error='Google Play Games could not verify this connection. Start again and try once more.'), 502
     with raw_state() as data:
+        try:
+            remaining_budget()
+        except DeadlineExceeded:
+            return timed_out()
         if not active_session(data, user_id, session_digest):
             return jsonify(error=INVALID_TICKET), 400
         links = data.setdefault('playGamesLinks', {})
@@ -329,8 +367,11 @@ def connect():
                 complete = False
                 break
         try:
-            google_json(GAMES_ENDPOINT + 'achievements/' + achievement + '/unlock', method='POST', access_token=access_token)
+            provider_call(GAMES_ENDPOINT + 'achievements/' + achievement + '/unlock', method='POST', access_token=access_token)
             unlocked += 1
+        except DeadlineExceeded:
+            complete = False
+            break
         except ProviderError:
             complete = False
     if score is not None:
@@ -338,7 +379,7 @@ def connect():
             still_active = active_session(data, user_id, session_digest)
         if still_active:
             try:
-                google_json(GAMES_ENDPOINT + 'leaderboards/' + configured['leaderboard_id'] + '/scores?' + urlencode({'score': str(score)}),
+                provider_call(GAMES_ENDPOINT + 'leaderboards/' + configured['leaderboard_id'] + '/scores?' + urlencode({'score': str(score)}),
                             method='POST', access_token=access_token)
                 submitted = score
             except ProviderError:
@@ -348,6 +389,10 @@ def connect():
     access_token = None
     with raw_state() as data:
         linked = data.get('playGamesLinks', {}).get(user_id)
+        try:
+            remaining_budget()
+        except DeadlineExceeded:
+            complete = False
         if not active_session(data, user_id, session_digest):
             complete = False
         if linked and linked.get('sync_attempt') == attempt:

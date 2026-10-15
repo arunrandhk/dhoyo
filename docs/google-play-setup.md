@@ -67,6 +67,20 @@ Google achievement unlocks persist; this integration does not revoke a previousl
 
 Linking can operate with the three core settings even when no achievement/leaderboard IDs exist. An invalid achievement mapping disables configuration rather than silently using an unintended ID. Players request linking or a fresh sync explicitly from the application. The backend does not retain refresh tokens for ongoing background sync. Partial external updates are reported with `syncComplete: false`, allowing the user to retry with fresh authorisation. Do not claim a live PGS connection until a real tester has completed that flow against the deployed backend.
 
+Start the connection with **Connect & sync with Dhoyo** in the Android app. The
+website approves that request and displays its status. Its **Check connection
+status** button reloads status; it does not submit achievements. Browser approval
+links expire after five minutes. The website removes an expired link and requires
+another explicit approval before offering a replacement.
+
+The backend uses a 60-second total budget for Google calls, each limited to at
+most 10 seconds and the remaining budget. Android allows 75 seconds to read the
+result; Gunicorn allows 90 seconds for the request. A deadline stops further
+updates and reports successful partial work accurately. Retrying requires fresh
+approval and Google authorisation; an interrupted request may already have
+updated Google. The timeout fixes alone do not configure Google credentials or
+deploy local changes.
+
 ## Deploy the backend
 
 For the existing Render service at `https://byte-ring-demo.onrender.com`:

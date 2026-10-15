@@ -1,12 +1,16 @@
 """The native bridge verifies PKCE/session ownership and publishes earned data."""
 import io
 import json
+import os
 import secrets
+import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime
 from http.client import IncompleteRead
+from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 
@@ -17,6 +21,7 @@ from app import app
 import auth
 import play_games
 import social
+from flask import g
 
 HTTP_JSON = play_games.google_json
 
@@ -379,3 +384,114 @@ def test_application_identity_verification_requires_server_returned_player_id(co
     monkeypatch.setattr(play_games, 'google_json', provider)
     assert connect(configured, approval(player)).status_code == 502
     assert get(player['client'], BASE + 'status').json['linked'] is False
+
+
+def test_deadline_after_exchange_stops_verification_and_does_not_link(configured, monkeypatch):
+    player = configured.make()
+    payload = approval(player)
+    clock = [1000.0]
+    monkeypatch.setattr(play_games, 'monotonic', lambda: clock[0])
+    def provider(endpoint, **kwargs):
+        result = configured.provider(endpoint, **kwargs)
+        clock[0] += 60
+        return result
+    monkeypatch.setattr(play_games, 'google_json', provider)
+    response = connect(configured, payload)
+    assert response.status_code == 504
+    assert [endpoint for endpoint, _ in configured.calls] == [play_games.TOKEN_ENDPOINT]
+    assert get(player['client'], BASE + 'status').json['linked'] is False
+    assert connect(configured, payload).status_code == 400
+    with social.raw_state() as data:
+        assert data['playGamesTickets'] == {}
+        serialized = json.dumps(data)
+    assert ACCESS_TOKEN not in serialized and REFRESH_TOKEN not in serialized
+
+
+def test_total_budget_includes_state_work_and_stops_later_badges_and_score(configured, monkeypatch):
+    player = configured.make()
+    payload = approval(player)
+    # Persist already earned immutable completion facts. The live tournament
+    # integration above independently checks how these authoritative facts arise.
+    with social.raw_state() as data:
+        data['playerProgress'] = dict(registrations={}, rosterBindings={}, completions={
+            f'tournament-{index}': dict(playerId=player['userId'], tournamentId=f'tournament-{index}',
+                sport='Football' if index % 2 else 'Cricket', season='2035-Q1',
+                earnedAt='2035-01-10T00:00:00+00:00', registeredAt='2035-01-01T00:00:00+00:00')
+            for index in range(5)})
+    clock = [1000.0]
+    monkeypatch.setattr(play_games, 'monotonic', lambda: clock[0])
+    original_targets = play_games.sync_targets
+    def targets(*args):
+        result = original_targets(*args)
+        clock[0] += 20
+        return result
+    def provider(endpoint, **kwargs):
+        assert clock[0] < 1060
+        result = configured.provider(endpoint, **kwargs)
+        clock[0] += 10
+        return result
+    monkeypatch.setattr(play_games, 'sync_targets', targets)
+    monkeypatch.setattr(play_games, 'google_json', provider)
+    response = connect(configured, payload)
+    assert response.status_code == 200
+    assert response.json['linked'] is True
+    assert response.json['syncComplete'] is False
+    assert response.json['syncedAchievements'] == 2
+    assert response.json['submittedScore'] is None
+    endpoints = [endpoint for endpoint, _ in configured.calls]
+    assert len(endpoints) == 4
+    assert not any('achievement_five' in endpoint or 'achievement_sports' in endpoint or '/leaderboards/' in endpoint for endpoint in endpoints)
+    assert clock[0] == 1060
+    assert get(player['client'], BASE + 'status').json['lastSyncedAt'] is None
+    with social.raw_state() as data:
+        linked = data['playGamesLinks'][player['userId']]
+        assert 'sync_attempt' not in linked and 'sync_until' not in linked
+        serialized = json.dumps(data)
+    assert ACCESS_TOKEN not in serialized and REFRESH_TOKEN not in serialized
+
+
+def test_real_provider_timeout_clamped_to_remaining_monotonic_budget(configured, monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(play_games, 'monotonic', lambda: clock[0])
+    timeouts = []
+    class Response(io.BytesIO):
+        pass
+    def opened(request, timeout):
+        timeouts.append(timeout)
+        response = Response(b'{}')
+        response.status = 200
+        return response
+    monkeypatch.setattr(play_games.GOOGLE_HTTP, 'open', opened)
+    with app.test_request_context(BASE + 'connect', base_url='https://localhost'):
+        g.play_games_deadline = 1060
+        assert HTTP_JSON(play_games.TOKEN_ENDPOINT) == {}
+        clock[0] = 1057.25
+        assert HTTP_JSON(play_games.TOKEN_ENDPOINT) == {}
+        clock[0] = 1060
+        with pytest.raises(play_games.DeadlineExceeded):
+            HTTP_JSON(play_games.TOKEN_ENDPOINT)
+    assert timeouts == [10, 2.75]
+
+
+def test_startup_actually_passes_server_timeout_longer_than_sync_budget(tmp_path):
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    init_python = binaries / 'python'
+    init_python.write_text('#!/bin/sh\nexit 0\n')
+    init_python.chmod(0o755)
+    capture = tmp_path / 'gunicorn-arguments.json'
+    server = binaries / 'gunicorn'
+    server.write_text('#!' + sys.executable + '\nimport json, os, sys\n'
+        'with open(os.environ["DHOYO_STARTUP_CAPTURE"], "w") as output:\n'
+        '    json.dump(sys.argv[1:], output)\n')
+    server.chmod(0o755)
+    environment = dict(os.environ, PATH=str(binaries) + os.pathsep + os.environ.get('PATH', ''),
+        DHOYO_STARTUP_CAPTURE=str(capture), PORT='8123', WEB_CONCURRENCY='3')
+    result = subprocess.run(['/bin/sh', str(Path(play_games.__file__).with_name('start.sh'))],
+                            env=environment, capture_output=True, text=True, timeout=5)
+    assert result.returncode == 0, result.stderr
+    arguments = json.loads(capture.read_text())
+    timeout = int(arguments[arguments.index('--timeout') + 1])
+    assert timeout == 90 and play_games.REQUEST_BUDGET == 60
+    assert arguments[arguments.index('--bind') + 1] == '0.0.0.0:8123'
+    assert arguments[arguments.index('--workers') + 1] == '3'

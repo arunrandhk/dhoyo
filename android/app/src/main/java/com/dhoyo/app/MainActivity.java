@@ -387,7 +387,7 @@ public final class MainActivity extends Activity {
             connection.setRequestMethod("POST");
             connection.setInstanceFollowRedirects(false);
             connection.setConnectTimeout(15000);
-            connection.setReadTimeout(15000);
+            connection.setReadTimeout(75000);
             connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("X-Dhoyo-Request", "1");
