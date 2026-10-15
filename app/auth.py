@@ -28,6 +28,13 @@ def test_demo_enabled():
     return current_app.testing and current_app.config.get('AUTH_TEST_DEMO', False)
 
 
+def email_activation_bypass_enabled():
+    """Temporary operator switch for controlled account testing."""
+    value = current_app.config.get('AUTH_SKIP_EMAIL_ACTIVATION',
+                                   os.environ.get('AUTH_SKIP_EMAIL_ACTIVATION', '0'))
+    return str(value).casefold() in ('1', 'true', 'yes', 'on')
+
+
 def render_terminates_tls():
     # Render's public ingress redirects HTTP and terminates HTTPS; its app port
     # is not publicly reachable. Do not trust client-supplied forwarded headers.
@@ -233,8 +240,9 @@ def register():
     if not isinstance(password, str) or not 10 <= len(password) <= 128:
         return jsonify(error='Use a password between 10 and 128 characters'), 400
     email = email.strip().casefold()
-    settings = None if legacy_registration_enabled() else activation_settings()
-    if settings is None and not legacy_registration_enabled():
+    skip_activation = legacy_registration_enabled() or email_activation_bypass_enabled()
+    settings = None if skip_activation else activation_settings()
+    if settings is None and not skip_activation:
         return jsonify(error='Account activation email is temporarily unavailable. Please try again later.'), 503
     with raw_state() as data:
         now = time.time()
@@ -255,8 +263,8 @@ def register():
         accounts = data.setdefault('accounts', {})
         if email in accounts:
             return jsonify(error='An account with this email already exists. Sign in instead.'), 409
-        player_id = create_account(data, payload, email, password_hash, verified=legacy_registration_enabled())
-        if legacy_registration_enabled():
+        player_id = create_account(data, payload, email, password_hash, verified=skip_activation)
+        if skip_activation:
             return session_response(data, player_id), 201
     return send_activation(email, player_id, settings, created=True)
 

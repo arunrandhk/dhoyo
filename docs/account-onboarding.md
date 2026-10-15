@@ -92,6 +92,13 @@ For Render, add the Google client ID, sender settings and public
 The blueprint includes the public URL setting and an optional blank Google ID.
 No Google client secret is needed for this callback flow.
 
+For a short, controlled testing window only, set
+`AUTH_SKIP_EMAIL_ACTIVATION=1` in the service environment and redeploy. New
+password and Google accounts will be marked verified and signed in immediately,
+without sending activation email. Remove the variable or set it to `0` and
+redeploy as soon as testing is complete; leaving this enabled allows anyone to
+register without proving email ownership.
+
 For the existing EC2 deployment script, add optional fields to the same private
 Secrets Manager JSON used by deployment: `google_client_id`,
 `password_reset_base_url`, and the selected provider's settings. Resend uses

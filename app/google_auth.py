@@ -8,7 +8,8 @@ from flask import Blueprint, current_app, jsonify, request
 from werkzeug.security import generate_password_hash
 
 from auth import (COOKIE, digest, jwt_secret, current_user_id, render_terminates_tls,
-                  valid_email, validate_onboarding, create_account, session_response)
+                  valid_email, validate_onboarding, create_account, session_response,
+                  email_activation_bypass_enabled)
 from password_reset import setting
 
 google_auth = Blueprint('google_auth', __name__, url_prefix='/api/auth')
@@ -185,16 +186,18 @@ def sign_in():
 @google_auth.post('/google/register')
 def register():
     from social import raw_state, body
-    from account_activation import activation_settings, send_activation
     if not client_id() or not jwt_secret():
         return unavailable()
     payload = body()
     error = validate_onboarding(payload)
     if error:
         return jsonify(error=error), 400
-    settings = activation_settings()
-    if settings is None:
-        return jsonify(error='Account activation email is temporarily unavailable. Please try again later.'), 503
+    skip_activation = email_activation_bypass_enabled()
+    if not skip_activation:
+        from account_activation import activation_settings
+        settings = activation_settings()
+        if settings is None:
+            return jsonify(error='Account activation email is temporarily unavailable. Please try again later.'), 503
     ticket_digest = digest(request.cookies.get(SIGNUP_COOKIE, ''))
     with raw_state() as data:
         if not reserve_limit(data, 'register', maximum=10):
@@ -217,9 +220,14 @@ def register():
             del data['googleSignupTickets'][ticket_digest]
             return jsonify(error='This account already exists. Sign in to continue.'), 409
         email = ticket['email']
-        player_id = create_account(data, payload, email, password_hash, google_subject=ticket['subject'])
+        player_id = create_account(data, payload, email, password_hash,
+                                   verified=skip_activation, google_subject=ticket['subject'])
         del data['googleSignupTickets'][ticket_digest]
-    response = send_activation(email, player_id, settings, created=True)
+        if skip_activation:
+            response = session_response(data, player_id)
+    if not skip_activation:
+        from account_activation import send_activation
+        response = send_activation(email, player_id, settings, created=True)
     # send_activation may include a status tuple; delete the short-lived cookie
     # after either successful delivery or a recoverable provider failure.
     from flask import make_response
