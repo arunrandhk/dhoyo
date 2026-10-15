@@ -370,7 +370,12 @@ def login():
         if not identity or not verified or not account or (account['player_id'], account['password_hash']) != identity:
             return jsonify(error='Email or password is incorrect'), 401
         if not account.get('email_verified', True):
-            return jsonify(error='Activate your account using the link sent to your email.', activationRequired=True), 403
+            if not email_activation_bypass_enabled():
+                return jsonify(error='Activate your account using the link sent to your email.', activationRequired=True), 403
+            # During the explicit testing window, verify an existing pending
+            # account only after its password has been checked successfully.
+            account['email_verified'] = True
+            account['email_verified_at'] = int(time.time())
         attempts = data.setdefault('loginAttempts', {})
         attempts.pop(key, None)
         return session_response(data, account['player_id'])
