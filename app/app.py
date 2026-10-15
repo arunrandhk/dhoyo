@@ -6,6 +6,9 @@ from arena import arena
 from messages import messages
 from friends import friends
 from organisations import organisations
+from progression import progression
+from reminders import reminders
+from play_games import play_games
 from db import (
     initialize_database,
     test_database_connection,
@@ -22,6 +25,9 @@ app.register_blueprint(arena)
 app.register_blueprint(messages)
 app.register_blueprint(friends)
 app.register_blueprint(organisations)
+app.register_blueprint(progression)
+app.register_blueprint(reminders)
+app.register_blueprint(play_games)
 from auth import install_auth, render_terminates_tls, secure_transport
 install_auth(app)
 
@@ -37,13 +43,23 @@ def fresh_frontend(response):
     if request.path.startswith(("/static/", "/api/")):
         response.headers["Cache-Control"] = "no-store"
     response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; connect-src 'self'; object-src 'none'; "
+        "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; "
+        "style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; "
+        "img-src 'self' data: https:; connect-src 'self' https://accounts.google.com/gsi/; "
+        "frame-src https://accounts.google.com/gsi/; object-src 'none'; "
         "base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
     )
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['Referrer-Policy'] = 'no-referrer'
+    if request.path in ('/ring', '/sportspace', '/static/sportspace/index.html'):
+        from google_auth import client_id
+        if client_id():
+            # GIS validates the authorised browser origin. Keep API and emailed
+            # acknowledgement pages on the stricter no-referrer policy.
+            response.headers['Referrer-Policy'] = ('strict-origin-when-cross-origin'
+                if request.is_secure or render_terminates_tls() else 'no-referrer-when-downgrade')
+    response.headers['Cross-Origin-Opener-Policy'] = 'same-origin-allow-popups'
     if request.is_secure or render_terminates_tls():
         response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response

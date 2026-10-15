@@ -161,7 +161,7 @@ test('editor handles a loading account and requires every location field', () =>
   assert.equal(dialog.querySelector('.profile-save').disabled, true);
 });
 
-test('own edit controls precede connections and stay hidden on other player profiles', () => {
+test('own profile exposes tournament tools before connections and hides private actions on other profiles', () => {
   const context = vm.createContext({
     arena: {route: 'player/player-owner', data: {currentUserId: initialPlayer.id, teams: []}},
     playerHub: {profiles: new Map(), errors: new Map()},
@@ -174,6 +174,28 @@ test('own edit controls precede connections and stay hidden on other player prof
   vm.runInContext(profile.slice(profile.indexOf('playerPage=function(){'), profile.indexOf('\n};', profile.indexOf('playerPage=function(){')) + 3), context);
   const markup = context.playerPage();
   assert.ok(markup.indexOf('data-edit-profile') < markup.indexOf('id="profile-connections"'));
+  assert.match(markup, /class="hub-tournament-link" href="#progress">Tournament achievements & rankings/);
+  assert.match(markup, /class="hub-tournament-link" href="#reminders">Tournament reminders/);
+  assert.ok(markup.indexOf('href="#progress"') < markup.indexOf('id="profile-connections"'));
+  assert.ok(markup.indexOf('href="#reminders"') < markup.indexOf('id="profile-connections"'));
   context.arena.route = 'player/another-player';
-  assert.doesNotMatch(context.playerPage(), /data-edit-profile/);
+  assert.doesNotMatch(context.playerPage(), /data-edit-profile|hub-tournament-link|href="#progress"|href="#reminders"/);
+});
+
+test('Home exposes real tournament tools before the feed without needing profile or progress data', () => {
+  const context = vm.createContext({
+    icon: () => '', social: {online: true}, state: {posts: []}, matches: () => true,
+    ringStories: () => '', ringFeed: () => '', sports: [], filter: 'All sports', arena: {data: null},
+  });
+  const profile = source('player-hub.js'), ring = source('ring.js');
+  vm.runInContext(profile.slice(profile.indexOf('function hubHomeConnections(){'), profile.indexOf('// The connections graph')), context);
+  vm.runInContext(ring.slice(ring.indexOf('function ringHome() {'), ring.indexOf('function discoverRing() {')), context);
+  const markup = context.ringHome();
+  assert.match(markup, /<nav class="hub-player-tools" aria-label="Your tournament tools">/);
+  assert.match(markup, /href="#progress"/);
+  assert.match(markup, /Achievements & rankings/);
+  assert.match(markup, /href="#reminders"/);
+  assert.match(markup, /Tournament reminders/);
+  assert.ok(markup.indexOf('Your tournament tools') < markup.indexOf('Social feed'));
+  assert.doesNotMatch(markup, /games played|wins|badges earned|unread reminders/i);
 });

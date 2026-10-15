@@ -105,6 +105,10 @@ def install_auth(app):
     app.register_blueprint(auth)
     from password_reset import password_reset
     app.register_blueprint(password_reset)
+    from account_activation import account_activation
+    from google_auth import google_auth
+    app.register_blueprint(account_activation)
+    app.register_blueprint(google_auth)
 
     @app.before_request
     def authenticate():
@@ -130,6 +134,10 @@ def install_auth(app):
         if request.method == 'POST' and request.path in ('/api/auth/register', '/api/auth/login', '/api/auth/change-password') and not jwt_secret():
             current_app.logger.error('Authentication unavailable: configure AUTH_JWT_SECRET with at least 32 bytes')
             return jsonify(error='Sign-in is temporarily unavailable. Please try again later.'), 503
+        # Native Android cannot use the browser's session cookie. Its connection
+        # endpoint proves an explicitly approved, single-use ticket plus PKCE.
+        if (request.method, request.path) in {('GET', '/api/play-games/config'), ('POST', '/api/play-games/connect')}:
+            return
         token = request.cookies.get(COOKIE)
         claims = verified_session_claims(token) if token else None
         if claims:
@@ -137,7 +145,10 @@ def install_auth(app):
             with raw_state() as data:
                 session = data.get('sessions', {}).get(digest(token))
                 if session and session['user_id'] == claims['sub'] and session['expires'] > time.time():
-                    g.user_id = session['user_id']
+                    account = next((value for value in data.get('accounts', {}).values()
+                                    if value['player_id'] == session['user_id']), None)
+                    if account and account.get('email_verified', True):
+                        g.user_id = session['user_id']
         if request.path.startswith('/api/auth/'):
             from auth_envelope import PATHS, decrypt_request
             if request.method == 'POST' and request.path in PATHS:
@@ -163,10 +174,16 @@ def account_identity(data, user_id):
                     if player['id'] == user_id), None)
     return dict(userId=user_id, name=profile['name'] if profile else '',
                 accountType=account_type,
-                organisationId=account.get('organisation_id') if account else None)
+                organisationId=account.get('organisation_id') if account else None,
+                emailVerified=account.get('email_verified', True) if account else False,
+                googleLinked=bool(account and account.get('google_subject')))
 
 
 def session_response(data, player_id, **payload):
+    account = next((value for value in data.get('accounts', {}).values()
+                    if value['player_id'] == player_id), None)
+    if account and not account.get('email_verified', True):
+        return jsonify(error='Activate your account using the link sent to your email.', activationRequired=True), 403
     issued = int(time.time())
     expires = issued + LIFETIME
     token = jwt.encode(dict(sub=player_id, jti=secrets.token_urlsafe(32), iat=issued,
@@ -204,22 +221,21 @@ def encryption_key():
 
 @auth.post('/register')
 def register():
-    from social import raw_state, body, string, SPORTS
-    from arena import ensure_arena
+    from social import raw_state, body
+    from account_activation import activation_settings, send_activation
     payload = body()
     name, email, password = payload.get('name'), payload.get('email'), payload.get('password')
-    account_type = payload.get('accountType', 'player')
-    if account_type not in ('player', 'organisation'):
-        return jsonify(error='Choose a player or organisation account'), 400
-    if account_type == 'organisation' and not string(payload.get('organisationName'), 100):
-        return jsonify(error='Enter your organisation name (maximum 100 characters)'), 400
-    if not string(name, 100) or not isinstance(email, str) or len(email) > 254 or '@' not in email or '.' not in email.rsplit('@', 1)[-1] or any(c.isspace() for c in email):
+    error = validate_onboarding(payload, require_phone=not legacy_registration_enabled())
+    if error:
+        return jsonify(error=error), 400
+    if not valid_email(email):
         return jsonify(error='Enter your name and a valid email address'), 400
     if not isinstance(password, str) or not 10 <= len(password) <= 128:
         return jsonify(error='Use a password between 10 and 128 characters'), 400
-    if payload.get('sport') not in SPORTS or any(not string(payload.get(k), 80) for k in ('city', 'state', 'country')):
-        return jsonify(error='Choose your sport and enter your city, state and country'), 400
     email = email.strip().casefold()
+    settings = None if legacy_registration_enabled() else activation_settings()
+    if settings is None and not legacy_registration_enabled():
+        return jsonify(error='Account activation email is temporarily unavailable. Please try again later.'), 503
     with raw_state() as data:
         now = time.time()
         attempts = data.setdefault('registrationAttempts', {})
@@ -239,21 +255,73 @@ def register():
         accounts = data.setdefault('accounts', {})
         if email in accounts:
             return jsonify(error='An account with this email already exists. Sign in instead.'), 409
-        players = ensure_arena(data)['players']
-        player_id = 'player-' + secrets.token_hex(12)
-        accounts[email] = dict(player_id=player_id, password_hash=password_hash,
-                               account_type=account_type)
-        player = dict(id=player_id, name=name.strip(), initials=''.join(w[0] for w in name.split())[:2].upper(),
-                      image='', avatar='', bio='', photoPrivacy='friends', awards=dict(Star=0, Diamond=0, Gold=0, Silver=0),
-                      gamesPlayed=0, wins=0, supporters=[], teamId=None)
-        player.update({k: payload[k].strip() for k in ('city', 'state', 'country', 'sport')})
-        players.append(player)
-        data.setdefault('userPreferences', {})[player_id] = dict(sports=[player['sport']], following=[], **{k: player[k] for k in ('city', 'state', 'country')})
-        if account_type == 'organisation':
-            from organisations import create_organisation
-            organisation = create_organisation(data, player_id, payload['organisationName'], player)
-            accounts[email]['organisation_id'] = organisation['id']
-        return session_response(data, player_id), 201
+        player_id = create_account(data, payload, email, password_hash, verified=legacy_registration_enabled())
+        if legacy_registration_enabled():
+            return session_response(data, player_id), 201
+    return send_activation(email, player_id, settings, created=True)
+
+
+def legacy_registration_enabled():
+    """Compatibility is opt-in and impossible outside an explicitly testing app."""
+    return current_app.testing and current_app.config.get('AUTH_TEST_LEGACY_REGISTRATION', False)
+
+
+def valid_email(email):
+    return (isinstance(email, str) and len(email) <= 254 and email.count('@') == 1
+            and bool(email.split('@')[0]) and '.' in email.rsplit('@', 1)[-1]
+            and not any(c.isspace() or ord(c) < 32 or ord(c) == 127 for c in email))
+
+
+def pending_account_ids(data):
+    """Unactivated identities stay private; legacy and seeded profiles stay visible."""
+    return {account['player_id'] for account in data.get('accounts', {}).values()
+            if account.get('email_verified') is False}
+
+
+def validate_onboarding(payload, require_phone=True):
+    from social import string, SPORTS
+    if not string(payload.get('name'), 100):
+        return 'Enter your name (maximum 100 characters)'
+    if payload.get('accountType', 'player') not in ('player', 'organisation'):
+        return 'Choose a player or organisation account'
+    if payload.get('accountType') == 'organisation' and not string(payload.get('organisationName'), 100):
+        return 'Enter your organisation name (maximum 100 characters)'
+    if payload.get('sport') not in SPORTS or any(not string(payload.get(k), 80) for k in ('city', 'state', 'country')):
+        return 'Choose your sport and enter your city, state and country'
+    if require_phone:
+        phone = payload.get('phone')
+        if isinstance(phone, str) and len(phone) <= 40 and re.fullmatch(r'\+[0-9 ()-]+', phone):
+            phone = re.sub(r'[ ()-]', '', phone)
+        if not isinstance(phone, str) or not re.fullmatch(r'\+[1-9][0-9]{7,14}', phone):
+            return 'Enter your phone number with country code, for example +919876543210'
+        payload['phone'] = phone
+    return None
+
+
+def create_account(data, payload, email, password_hash, verified=False, google_subject=None):
+    """Persist only profile fields publicly; contact information stays on the account."""
+    from arena import ensure_arena
+    name = payload['name'].strip()
+    account_type = payload.get('accountType', 'player')
+    player_id = 'player-' + secrets.token_hex(12)
+    account = dict(player_id=player_id, password_hash=password_hash, account_type=account_type,
+                   email_verified=verified)
+    if payload.get('phone'):
+        account.update(phone=payload['phone'], phone_verified=False)
+    if google_subject:
+        account['google_subject'] = google_subject
+    data.setdefault('accounts', {})[email] = account
+    player = dict(id=player_id, name=name, initials=''.join(w[0] for w in name.split())[:2].upper(),
+                  image='', avatar='', bio='', photoPrivacy='friends', awards=dict(Star=0, Diamond=0, Gold=0, Silver=0),
+                  gamesPlayed=0, wins=0, supporters=[], teamId=None)
+    player.update({k: payload[k].strip() for k in ('city', 'state', 'country', 'sport')})
+    ensure_arena(data)['players'].append(player)
+    data.setdefault('userPreferences', {})[player_id] = dict(sports=[player['sport']], following=[], **{k: player[k] for k in ('city', 'state', 'country')})
+    if account_type == 'organisation':
+        from organisations import create_organisation
+        organisation = create_organisation(data, player_id, payload['organisationName'], player)
+        account['organisation_id'] = organisation['id']
+    return player_id
 
 
 @auth.post('/login')
@@ -293,6 +361,8 @@ def login():
         account = data.get('accounts', {}).get(email)
         if not identity or not verified or not account or (account['player_id'], account['password_hash']) != identity:
             return jsonify(error='Email or password is incorrect'), 401
+        if not account.get('email_verified', True):
+            return jsonify(error='Activate your account using the link sent to your email.', activationRequired=True), 403
         attempts = data.setdefault('loginAttempts', {})
         attempts.pop(key, None)
         return session_response(data, account['player_id'])

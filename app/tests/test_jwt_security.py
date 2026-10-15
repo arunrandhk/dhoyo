@@ -91,7 +91,9 @@ def test_signed_cookie_contains_only_identity_and_expiry_not_credentials(clients
     assert claims['exp'] - claims['iat'] == LIFETIME
     assert cookie.http_only and cookie.secure and cookie.same_site == 'Lax'
     assert EMAIL not in json.dumps(claims) and PASSWORD not in json.dumps(claims)
-    assert set(registered.json) == {'userId', 'name', 'accountType', 'organisationId'}
+    assert set(registered.json) == {'userId', 'name', 'accountType', 'organisationId', 'emailVerified', 'googleLinked'}
+    assert registered.json['emailVerified'] is True
+    assert registered.json['googleLinked'] is False
     assert registered.json['accountType'] == 'player'
     assert registered.json['organisationId'] is None
 
@@ -258,6 +260,7 @@ def test_login_rotation_and_logout_revoke_previously_issued_jwts(clients):
     assert response.status_code == 200 and response.json == {
         'userId': player_id, 'name': 'JWT Test Player',
         'accountType': 'player', 'organisationId': None,
+        'emailVerified': True, 'googleLinked': False,
     }
     rotated = owner.get_cookie(COOKIE).value
     assert original != rotated

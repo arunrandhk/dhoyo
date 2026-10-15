@@ -37,3 +37,11 @@ services:
         sync: false # Private API key created in Resend.
       - key: PASSWORD_RESET_FROM
         sync: false # Sender address on your verified Resend domain.
+      - key: PASSWORD_RESET_BASE_URL
+        sync: false # Public HTTPS app URL, for example https://your-domain/ring.
+      - key: GOOGLE_CLIENT_ID
+        value: "" # Optional Google web OAuth client ID; blank keeps Google sign-in disabled.
+      # Optional Android/Play Games integration: docs/google-play-setup.md.
+      # Add PLAY_GAMES_WEB_CLIENT_SECRET privately after creating a game-server credential.
+      - key: ANDROID_PACKAGE_NAME
+        value: com.dhoyo.app

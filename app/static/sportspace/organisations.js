@@ -131,6 +131,7 @@ async function orgLoad(route=view){
 }
 function orgNavigation(){
   const routes=orgIsOrganisation()?[['organisation','Organisation workspace'],['grounds','Ground directory'],['tournaments','Discover tournaments']]:[['grounds','Book a ground'],['tournaments','Tournaments'],['activity','Saved & activity']];
+  routes.push(['progress',orgIsOrganisation()?'Seasonal rankings':'Achievements & rankings'],['reminders','Reminders'],['google-play','Google Play']);
   return `<nav class="org-service-nav" aria-label="Grounds and tournaments">${routes.map(([route,label])=>`<a href="#${route}" ${view===route?'aria-current="page"':''}>${escape(label)}</a>`).join('')}<button type="button" class="org-button org-refresh" data-org-retry ${orgService.loading?'disabled':''}>Refresh</button></nav>`;
 }
 function orgGroundCard(ground){
@@ -254,8 +255,14 @@ function orgAccountChrome(){
   const home=document.querySelector('[data-bottom-route="ring"], [data-bottom-route="organisation"]');
   if(home){home.href=orgIsOrganisation()?'#organisation':'#ring';home.dataset.bottomRoute=orgIsOrganisation()?'organisation':'ring';home.querySelector('span').textContent=orgIsOrganisation()?'Workspace':'Home';}
   if(account.userId){
-    if(account.name&&(orgIsService()||orgIsOrganisation()))document.querySelector('.sidebar-bottom strong').textContent=account.name;
+    if(account.name)document.querySelector('.sidebar-bottom strong').textContent=account.name;
     document.querySelector('.sidebar-bottom small').textContent=orgIsOrganisation()?'Organisation administrator':'Your player account';
+    if(['progress','reminders','google-play'].includes(view)){
+      const profile=typeof arenaPlayer==='function'?arenaPlayer(account.userId):null;
+      const initials=String(account.name||'Player').trim().split(/\s+/).map(word=>word[0]).join('').slice(0,2).toUpperCase();
+      document.querySelectorAll('.avatar.mine,.bottom-profile-avatar').forEach(node=>{node.innerHTML=profile?.avatar?`<img src="${escape(profile.avatar)}" alt="Your profile photo">`:escape(initials);});
+      $('#connection-status').textContent='Signed in as '+(account.name||'Player');
+    }
     if(orgIsService())$('#connection-status').textContent=orgService.loading?'Syncing your workspace…':orgService.error?'Unable to sync · Try again':orgService.syncedAt?'Last synced '+new Intl.DateTimeFormat('en-IN',{hour:'numeric',minute:'2-digit'}).format(orgService.syncedAt):'Signed in';
   }
 }

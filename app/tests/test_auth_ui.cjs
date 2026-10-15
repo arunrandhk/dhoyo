@@ -325,6 +325,46 @@ test('login accepts existing passwords shorter than the new password minimum', a
   assert.deepEqual(page.navigations, ['/ring#ring']);
 });
 
+test('signup collects a required private international phone number', async () => {
+  const page = await accountPage({register: true});
+  const phone = page.form.querySelector('[name="phone"]');
+  assert.equal(phone.type, 'tel');
+  assert.equal(phone.getAttribute('autocomplete'), 'tel');
+  assert.notEqual(phone.getAttribute('required'), null);
+  page.fill({email: 'player@example.com', password: 'long-password-123', phone: '+91 98765 43210'});
+  await page.submit();
+  assert.equal(page.requests[0].payload.phone, '+91 98765 43210');
+});
+
+test('pending signup requires activation before identity, password saving or navigation', async () => {
+  const page = await accountPage({register: true, authenticate: () => response({
+    activationRequired: true, email: 'player@example.com', message: 'Check your email and activate your account.'
+  }, 201)});
+  page.fill({email: 'player@example.com', password: 'long-password-123', phone: '+919876543210'});
+  await page.submit();
+  assert.equal(page.form.getAttribute('id'), 'account-login-form');
+  assert.match(page.form.notice.textContent, /activate your account/);
+  assert.equal(page.stored.length, 0);
+  assert.deepEqual(page.navigations, []);
+  assert.equal(vm.runInContext('account.userId', page.context), null);
+});
+
+test('an inactive login opens activation recovery without saving credentials', async () => {
+  const calls = [];
+  const page = await accountPage({authenticate: () => response({
+    activationRequired: true, error: 'Activate your account using your email link.'
+  }, 403)});
+  page.context.DhoyoOnboarding = {pending: (...values) => calls.push(values)};
+  page.fill({email: 'player@example.com', password: 'long-password-123'});
+  await page.submit();
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0][0], 'player@example.com');
+  assert.match(calls[0][1], /Activate your account/);
+  assert.equal(page.form.querySelector('[name="password"]').value, '');
+  assert.equal(page.stored.length, 0);
+  assert.deepEqual(page.navigations, []);
+});
+
 test('forgot password offers an email-only form and preserves the email while switching modes', async () => {
   const page = await accountPage();
   page.fill({email: 'player@example.com', password: 'private-password'});
@@ -558,4 +598,26 @@ test('repeated unauthorized responses preserve the current recovery form and dra
   await page.context.fetch('/api/example');
   assert.equal(page.form, forgotForm);
   assert.equal(page.form.querySelector('[name="email"]').value, 'corrected@example.com');
+});
+
+test('signing in returns players to the requested tournament feature', async () => {
+  for (const route of ['progress', 'reminders', 'google-play', 'google-play/connect/' + 'a'.repeat(43)]) {
+    const page = await accountPage({hash: '#' + route});
+    page.fill({email: 'player@example.com', password: 'correct-password-123'});
+    await page.submit();
+    assert.deepEqual(page.navigations, ['/ring#' + route]);
+  }
+});
+
+test('untrusted account destinations fall back to the home feed', async () => {
+  const page = await accountPage({hash: '#https://untrusted.example'});
+  page.fill({email: 'player@example.com', password: 'correct-password-123'});
+  await page.submit();
+  assert.deepEqual(page.navigations, ['/ring#ring']);
+});
+
+test('the signup link opens the required details form directly', async () => {
+  const page = await accountPage({hash: '#signup'});
+  assert.equal(page.form.getAttribute('id'), 'account-register-form');
+  assert.ok(page.form.fields.find(field => field.name === 'phone'));
 });

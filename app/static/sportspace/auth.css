@@ -330,3 +330,15 @@ body.account-visible { overflow: hidden; }
 /* Account state and organisation sign-up fields use the existing access layout. */
 #account-screen [hidden] { display: none !important; }
 #account-screen .account-role-note { margin: 12px 0 0; color: #aebec7; font-size: 11px; line-height: 1.6; }
+.account-google { margin: 0 0 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid #ffffff18; }
+.account-google[hidden] { display: none; }
+.account-google-label { color: var(--muted, #a1a1aa); font-size: .85rem; text-align: center; }
+.account-google-button { display: flex; justify-content: center; min-height: 44px; margin: .65rem 0; }
+.account-google-button[hidden] { display: none; }
+.account-google-status { margin: .5rem 0 0; color: #aebec7; font-size: 11px; line-height: 1.6; text-align: center; }
+.account-google-unavailable { width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid #ffffff24; border-radius: 6px; background: #ffffff08; color: #b7c2ca; font: inherit; font-size: 12px; cursor: not-allowed; }
+.account-google-identity { overflow-wrap: anywhere; font-size: .9rem; }
+.account-onboarding-form .account-back { border: 0; background: transparent; color: inherit; cursor: pointer; text-decoration: underline; }
+.account-onboarding-form .account-onboarding-organisation[hidden] { display: none; }
+.account-google-dialog { width: min(440px, calc(100vw - 32px)); padding: 1.5rem; border: 1px solid #454545; border-radius: 16px; background: #161616; color: #fafafa; }
+.account-google-dialog::backdrop { background: #000a; }

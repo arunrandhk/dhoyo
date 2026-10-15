@@ -19,7 +19,11 @@
   <link rel="stylesheet" href="stickers.css">
   <link rel="stylesheet" href="friends.css">
   <link rel="stylesheet" href="organisations.css">
+  <link rel="stylesheet" href="progression.css">
+  <link rel="stylesheet" href="reminders.css">
+  <link rel="stylesheet" href="google-play.css">
   <script src="stickers.js" defer></script>
+  <script src="account-onboarding.js" defer></script>
   <script src="auth-ui.js" defer></script>
   <script src="auth-encryption.js" defer></script>
   <script src="app.js" defer></script>
@@ -34,6 +38,9 @@
   <script src="friends.js" defer></script>
   <script src="account-security.js" defer></script>
   <script src="organisations.js" defer></script>
+  <script src="progression.js" defer></script>
+  <script src="reminders.js" defer></script>
+  <script src="google-play.js" defer></script>
 </head>
 <body class="account-pending">
   <aside class="sidebar">
@@ -46,6 +53,9 @@
       <button data-ring-route="discover"><img class="nav-icon" src="icons/compass.svg" alt=""> Discover Arenas</button>
       <button data-view="grounds"><img class="nav-icon" src="icons/map-pin.svg" alt=""> Book a ground</button>
       <button data-view="tournaments"><img class="nav-icon" src="icons/trophy.svg" alt=""> Tournaments</button>
+      <button data-progress-route="progress"><img class="nav-icon" src="icons/trophy.svg" alt=""> Achievements & rankings</button>
+      <button data-view="reminders"><img class="nav-icon" src="icons/bookmark.svg" alt=""> Tournament reminders</button>
+      <button data-play-route="google-play"><img class="nav-icon" src="icons/trophy.svg" alt=""> Google Play</button>
       <button data-view="activity"><img class="nav-icon" src="icons/bookmark.svg" alt=""> Saved & activity</button>
     </nav>
     <div id="ring-memberships"></div>

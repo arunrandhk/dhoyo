@@ -35,3 +35,17 @@
 .hub-private-photos strong{font-size:16px}
 .hub-private-photos p{max-width:580px;margin:10px 0 0;font-size:13px;line-height:1.7;color:#adc2b9}
 .hub-photo-audience{display:inline-block;margin:7px 0;padding:5px 9px;border:1px solid #50623d;border-radius:6px;color:#d4fa62;font-size:11px}
+.hub-player-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:0 0 26px}
+.hub-player-tools>a{display:flex;align-items:center;gap:13px;min-width:0;min-height:88px;padding:17px 19px;border:1px solid #3b5755;border-radius:11px;background:#14272d;color:#edf4ec;text-decoration:none}
+.hub-player-tools>a:hover{background:#1d3539;border-color:#9bbd6a}
+.hub-player-tools>a>span:nth-child(2){display:grid;gap:6px;min-width:0}
+.hub-player-tools strong{font-size:14px;font-weight:650;line-height:1.4}
+.hub-player-tools small{color:#afc2ba;font-size:11px;line-height:1.5;margin:0}
+.hub-tool-icon{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border:1px solid #4c6750;border-radius:9px;background:#243a2b}
+.hub-tool-icon img{width:18px;height:18px;filter:invert(.85)}
+.hub-tool-arrow{margin-left:auto;color:#d4fa62;font-size:18px}
+.hub-profile-actions>.hub-tournament-link{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:10px 13px;border:1px solid #718f4b;border-radius:6px;background:#263b28;color:#d4fa62;font-size:11px;line-height:1.5;text-align:center;text-decoration:none}
+.hub-profile-actions>.hub-tournament-link:hover{border-color:#d4fa62;background:#344b2a}
+.hub-player-tools>a:focus-visible,.hub-profile-actions>.hub-tournament-link:focus-visible{outline:2px solid #d4fa62;outline-offset:4px}
+.hub-play-link{display:inline-flex;min-height:44px;align-items:center;margin:-12px 0 20px;color:#d4fa62;text-decoration:none;font-size:12px}.hub-play-link:focus-visible{outline:2px solid #d4fa62;outline-offset:4px}
+@media(max-width:640px){.hub-player-tools{grid-template-columns:1fr;gap:10px;margin-bottom:22px}.hub-player-tools>a{min-height:76px;padding:14px;gap:12px}.hub-player-tools strong{font-size:13px}.hub-profile-actions>.hub-tournament-link{min-height:42px;padding:10px 12px;font-size:11px}}

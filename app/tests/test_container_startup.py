@@ -45,7 +45,7 @@ def test_packaged_application_starts_and_serves_account_features(tmp_path):
         app.config['AUTH_TEST_DEMO'] = False
         # Domain smoke checks use the same explicit plaintext fixture opt-in as
         # the API tests; credential encryption has its own strict regression suite.
-        app.config.update(TESTING=True, AUTH_TEST_ALLOW_PLAINTEXT=True)
+        app.config.update(TESTING=True, AUTH_TEST_ALLOW_PLAINTEXT=True, AUTH_TEST_LEGACY_REGISTRATION=True)
         headers = {'X-Dhoyo-Request': '1'}
         owner, peer = app.test_client(), app.test_client()
         assert owner.get('/health').status_code == 200

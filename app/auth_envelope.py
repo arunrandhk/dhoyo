@@ -21,7 +21,8 @@ from flask import current_app, g, jsonify, request
 
 PATHS = frozenset('/api/auth/' + name for name in (
     'login', 'register', 'change-password', 'request-password-code',
-    'reset-password-code', 'forgot-password', 'reset-password'))
+    'reset-password-code', 'forgot-password', 'reset-password', 'activate-account',
+    'resend-activation', 'google', 'google/register', 'google/link'))
 LIFETIME = 120
 MAX_CHALLENGES = 2048
 MAX_RATE_ENTRIES = 2048

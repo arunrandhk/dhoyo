@@ -118,4 +118,6 @@ def acknowledge():
         player.update(acknowledgementStatus='acknowledged', verified=True)
         player.setdefault('acknowledgedAt', org.now().isoformat())
         player.setdefault('verifiedAt', player['acknowledgedAt'])
+        from progression import sync_progress
+        sync_progress(data)
         return jsonify(acknowledgementStatus='acknowledged', message='Your participation has been acknowledged.')

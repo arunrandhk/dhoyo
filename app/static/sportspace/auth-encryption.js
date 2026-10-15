@@ -4,7 +4,7 @@ async function encryptAccountPayload(path,payload){
   const local=['localhost','127.0.0.1','::1','[::1]'].includes(location.hostname);
   if(location.protocol!=='https:'&&!(location.protocol==='http:'&&local))throw new Error('Use HTTPS before sending account details.');
   if(!window.crypto?.subtle)throw new Error('Your browser cannot encrypt account details. Use a current browser over HTTPS.');
-  const supported=['login','register','change-password','request-password-code','reset-password-code','forgot-password','reset-password'];
+  const supported=['login','register','change-password','request-password-code','reset-password-code','forgot-password','reset-password','activate-account','resend-activation','google','google/register','google/link'];
   if(!supported.includes(path))throw new Error('Unsupported account action.');
   const endpoint='/api/auth/'+path,encoder=new TextEncoder();
   const decode=value=>{

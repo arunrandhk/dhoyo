@@ -131,6 +131,13 @@ def check_mail(legacy_links):
 
 
 def email_text(settings, token):
+    if settings.get('purpose') == 'account_activation':
+        activation_url = settings['base_url'] + '#activate-token=' + quote(token, safe='')
+        return ('Activate your Dhoyo account using this link:\n\n' + activation_url +
+                '\n\nThis link expires in 24 hours and can be used once. '
+                'If you did not create this account, ignore this email.\n')
+    if settings.get('purpose') == 'tournament_reminder':
+        return settings['reminder_text']
     if settings.get('purpose') == 'tournament_activation':
         return ('Your captain invited you to participate in "' + settings['tournament_name'] +
                 '" with team "' + settings['team_name'] + '".\n\n' +
@@ -154,6 +161,10 @@ def email_text(settings, token):
 
 
 def email_subject(settings):
+    if settings.get('purpose') == 'account_activation':
+        return 'Activate your Dhoyo account'
+    if settings.get('purpose') == 'tournament_reminder':
+        return settings['reminder_subject']
     if settings.get('purpose') == 'tournament_activation':
         return 'Acknowledge your Dhoyo tournament participation'
     if settings.get('purpose') == 'tournament_player':

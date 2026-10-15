@@ -49,6 +49,33 @@ for environment_name, secret_name in fields.items():
         raise SystemExit(f'Deployment stopped: invalid or missing {secret_name} in Secrets Manager.')
     values[environment_name] = value
 
+optional_fields = {
+    'GOOGLE_CLIENT_ID': 'google_client_id',
+    'PLAY_GAMES_APPLICATION_ID': 'play_games_application_id',
+    'PLAY_GAMES_WEB_CLIENT_ID': 'play_games_web_client_id',
+    'PLAY_GAMES_WEB_CLIENT_SECRET': 'play_games_web_client_secret',
+    'PLAY_GAMES_LEADERBOARD_ID': 'play_games_leaderboard_id',
+    'PLAY_GAMES_ACHIEVEMENTS_JSON': 'play_games_achievements_json',
+    'ANDROID_PACKAGE_NAME': 'android_package_name', 'PLAY_STORE_URL': 'play_store_url',
+    'PASSWORD_RESET_BASE_URL': 'password_reset_base_url',
+    'PASSWORD_RESET_FROM': 'password_reset_from', 'RESEND_API_KEY': 'resend_api_key',
+    'GMAIL_CLIENT_ID': 'gmail_client_id', 'GMAIL_CLIENT_SECRET': 'gmail_client_secret',
+    'GMAIL_REFRESH_TOKEN': 'gmail_refresh_token',
+    'SMTP_HOST': 'smtp_host', 'SMTP_PORT': 'smtp_port', 'SMTP_FROM': 'smtp_from',
+    'SMTP_USERNAME': 'smtp_username', 'SMTP_PASSWORD': 'smtp_password', 'SMTP_USE_TLS': 'smtp_use_tls',
+}
+for environment_name, secret_name in optional_fields.items():
+    value = secret.get(secret_name)
+    if value is None or value == '':
+        continue
+    if environment_name == 'SMTP_PORT' and type(value) is int:
+        value = str(value)
+    if environment_name == 'SMTP_USE_TLS' and type(value) is bool:
+        value = str(value).lower()
+    if not isinstance(value, str) or any(character in value for character in '\r\n\x00'):
+        raise SystemExit(f'Deployment stopped: invalid {secret_name} in Secrets Manager.')
+    values[environment_name] = value
+
 if not values['DB_PORT'].isdigit() or not 1 <= int(values['DB_PORT']) <= 65535:
     raise SystemExit('Deployment stopped: invalid port in Secrets Manager.')
 try:

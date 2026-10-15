@@ -44,6 +44,13 @@ SPORTSPACE_SOCIAL_DB=/tmp/dhoyo-local.sqlite3 ../.venv/bin/python -m flask --app
 Open http://localhost:8002/ring. Stop with Ctrl+C. The older `/sportspace` link
 also works.
 
+New accounts require a private phone number, complete profile and emailed
+activation link before signing in. Configure an email sender and
+`PASSWORD_RESET_BASE_URL` for signup; optional Google sign-in also needs
+`GOOGLE_CLIENT_ID`. See [account onboarding setup](../../../docs/account-onboarding.md).
+Achievements and seasonal rankings are at `#progress`; tournament reminder
+preferences are at `#reminders`. Existing accounts keep their sign-in access.
+
 Opening `index.html` directly or using `python3 -m http.server` does not run the
 arena API. Match Updates, ground bookings and tournament demos remain available
 without it, but player rankings, support and team management require Flask.

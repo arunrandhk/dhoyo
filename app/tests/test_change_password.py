@@ -74,6 +74,7 @@ def test_change_rotates_session_revokes_account_credentials_and_preserves_other_
     assert response.json == {
         'userId': player_id,
         'name': 'Alex', 'accountType': 'player', 'organisationId': None,
+        'emailVerified': True, 'googleLinked': False,
         'message': 'Your password has been updated. Other sessions have been signed out.',
     }
     new_cookie = owner.get_cookie(COOKIE)

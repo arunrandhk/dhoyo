@@ -17,7 +17,8 @@ PLAYER_FIELDS = ('id', 'name', 'initials', 'avatar', 'sport')
 
 
 def registered_players(data):
-    account_ids = {account['player_id'] for account in data.get('accounts', {}).values()}
+    from auth import pending_account_ids
+    account_ids = {account['player_id'] for account in data.get('accounts', {}).values()} - pending_account_ids(data)
     return {player['id']: player for player in ensure_arena(data)['players']
             if player['id'] in account_ids}
 

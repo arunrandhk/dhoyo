@@ -14,5 +14,8 @@ def legacy_demo_fixtures(request, monkeypatch):
     # Existing API fixtures exercise domain behavior; encryption has separate
     # strict tests that disable this test-only compatibility switch.
     monkeypatch.setitem(app.config, 'AUTH_TEST_ALLOW_PLAINTEXT', True)
+    # Legacy fixtures exercise unrelated domain behavior. Production onboarding
+    # and its own regression tests never use this explicit test-only shortcut.
+    monkeypatch.setitem(app.config, 'AUTH_TEST_LEGACY_REGISTRATION', True)
     if request.node.path.name != 'test_auth.py':
         monkeypatch.setitem(app.config, 'AUTH_TEST_DEMO', True)

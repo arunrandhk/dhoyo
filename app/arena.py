@@ -89,10 +89,14 @@ def discovery_influence(value):
 
 
 def public_arena(data):
+    from auth import pending_account_ids
     value = ensure_arena(data)
+    pending_ids = pending_account_ids(data)
     team_influence, player_sources = discovery_influence(value)
     players = []
     for player in value['players']:
+        if player['id'] in pending_ids:
+            continue
         supporters = player['supporters']
         points = round(len(supporters) / 5, 1)
         players.append({**{key: val for key, val in public_photos(player, data).items() if key != 'supporters'}, 'teamIds': [t['id'] for t in value['teams'] if player['id'] in t['members']], 'rank': player_rank(player), 'communityStars': len(supporters), 'communityPoints': points, 'starScore': round(player['awards']['Star'] + points, 1), 'supported': current_user_id() in supporters})
@@ -201,9 +205,10 @@ def community_membership(community_id):
 
 @arena.post('/players/<player_id>/support')
 def support(player_id):
+    from auth import pending_account_ids
     with state() as data:
         player = find(ensure_arena(data)['players'], player_id)
-        if not player:
+        if not player or player_id in pending_account_ids(data):
             return jsonify(error='Player not found'), 404
         if player_id == current_user_id():
             return jsonify(error='You cannot support yourself'), 400
@@ -249,6 +254,7 @@ def join(team_id):
 @arena.post('/teams/<team_id>/members')
 @arena.post('/teams/<team_id>/requests/<request_id>')
 def manage_members(team_id, request_id=None):
+    from auth import pending_account_ids
     payload = body()
     with state() as data:
         value = ensure_arena(data)
@@ -270,6 +276,8 @@ def manage_members(team_id, request_id=None):
                 application['status'] = 'rejected'
                 return jsonify(public_arena(data))
         player_id = application['playerId'] if application else payload.get('playerId')
+        if isinstance(player_id, str) and player_id in pending_account_ids(data):
+            return jsonify(error='Player not found'), 404
         error = add_member(value, team, player_id)
         if error:
             return jsonify(error=error), 409

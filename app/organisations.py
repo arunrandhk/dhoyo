@@ -700,10 +700,13 @@ def publish_tournament(service, tournament, owner, timestamp):
 
 @organisations.get('/api/organisations')
 def organisation_list():
+    from auth import pending_account_ids
     with raw_state() as data:
         actor(data)
+        pending_ids = pending_account_ids(data)
         return jsonify(organisations=[public_organisation(item)
-                                     for item in ensure_service(data)['organisations']])
+                                     for item in ensure_service(data)['organisations']
+                                     if item['ownerId'] not in pending_ids])
 
 
 @organisations.get('/api/organisations/me')
@@ -950,6 +953,7 @@ def update_tournament(tournament_id):
 
 @organisations.post('/api/tournaments/<tournament_id>/<action>')
 def tournament_action(tournament_id, action):
+    from progression import sync_progress
     if action not in ('publish', 'start', 'complete', 'cancel'):
         raise ServiceError('Unknown tournament action', 404)
     payload()
@@ -973,6 +977,7 @@ def tournament_action(tournament_id, action):
             if tournament['status'] != 'live':
                 raise ServiceError('Only a live tournament can be completed', 409)
             tournament['status'] = 'completed'
+            tournament['completedAt'] = timestamp.isoformat()
         else:
             if tournament['status'] not in ('draft', 'open'):
                 raise ServiceError('Only a draft or open tournament can be cancelled', 409)
@@ -983,6 +988,7 @@ def tournament_action(tournament_id, action):
                 registration['status'] = 'cancelled'
                 cancel_payment(registration)
             tournament['status'] = 'cancelled'
+        sync_progress(data)
         return jsonify(tournament=public_tournament(service, tournament, owner['id']))
 
 
@@ -1000,6 +1006,7 @@ def verify_player_email_code(tournament_id):
 
 @organisations.post('/api/tournaments/<tournament_id>/registrations')
 def register_team(tournament_id):
+    from progression import sync_progress
     from tournament_verification import registration_roster, consume_roster_proofs
     value = payload(('teamName', 'answers', 'notes', 'playerEmails'), ('teamName',))
     if not string(value['teamName'], 60):
@@ -1024,6 +1031,7 @@ def register_team(tournament_id):
         validate_registration_membership(data, service, tournament, visitor, roster)
         registration = dict(id='registration-' + uuid4().hex, tournamentId=tournament_id,
                             playerId=visitor['id'], playerName=visitor['name'],
+                            createdAt=now().isoformat(),
                             teamName=team_name, status='registered', answers=answers, notes=notes,
                             entryFee=tournament.get('entryFee', 0),
                             totalAmount=tournament.get('entryFee', 0), currency='INR',
@@ -1033,11 +1041,13 @@ def register_team(tournament_id):
         registration['playerEmails'] = roster
         consume_roster_proofs(proofs, registration['id'])
         service['registrations'].append(registration)
+        sync_progress(data)
         return jsonify(registration=public_registration(registration)), 201
 
 
 @organisations.patch('/api/tournaments/<tournament_id>/registrations/me')
 def update_registration(tournament_id):
+    from progression import sync_progress
     from tournament_verification import registration_roster, consume_roster_proofs
     value = payload(('teamName', 'answers', 'notes', 'playerEmails'), ('teamName',))
     if not string(value['teamName'], 60):
@@ -1065,11 +1075,13 @@ def update_registration(tournament_id):
         registration['answers'] = answers
         registration['notes'] = notes
         registration['playerEmails'] = roster
+        sync_progress(data)
         return jsonify(registration=public_registration(registration))
 
 
 @organisations.post('/api/tournaments/<tournament_id>/registrations/me/cancel')
 def cancel_registration(tournament_id):
+    from progression import sync_progress
     payload()
     with raw_state() as data:
         visitor = actor(data, 'player')
@@ -1083,6 +1095,7 @@ def cancel_registration(tournament_id):
             raise ServiceError('Registration can only be cancelled before the open event starts', 409)
         registration['status'] = 'cancelled'
         cancel_payment(registration)
+        sync_progress(data)
         return jsonify(registration=public_registration(registration))
 
 

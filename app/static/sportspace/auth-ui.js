@@ -2,17 +2,29 @@
 const nativeFetch=window.fetch.bind(window);
 let releaseAccount;
 const accountReady=new Promise(resolve=>releaseAccount=resolve);
-const account={userId:null,name:'',accountType:'player',organisationId:null};
+const account={userId:null,name:'',accountType:'player',organisationId:null,email:'',phone:'',emailVerified:false,googleLinked:false};
+const accountFeatureRoutes=new Set(['progress','reminders','tournaments','activity','grounds','organisation','google-play']);
+function accountSafeRoute(route){return accountFeatureRoutes.has(route)||/^google-play\/connect\/[A-Za-z0-9_-]{43}$/.test(route);}
+let accountReturnRoute=accountSafeRoute(location.hash.slice(1))?location.hash.slice(1):'';
+const accountSignupRequested=['#signup','#register'].includes(location.hash);
+function accountDestination(identity=account){
+  return '/ring#'+(accountReturnRoute||(identity.accountType==='organisation'?'organisation':'ring'));
+}
 function setAccountIdentity(value){
   account.userId=value.userId||null;
   account.name=value.name||'';
   account.accountType=value.accountType==='organisation'?'organisation':'player';
   account.organisationId=value.organisationId||null;
+  account.email=value.email||'';
+  account.phone=value.phone||'';
+  account.emailVerified=value.emailVerified===true;
+  account.googleLinked=value.googleLinked===true;
 }
 let accountResetToken=new URLSearchParams(location.hash.slice(1)).get('reset-token')||'';
+let accountActivationToken=new URLSearchParams(location.hash.slice(1)).get('activate-token')||'';
 let accountRecoveryChallenge='',accountRecoveryEmail='',accountRecoveryReturnToProfile=false;
 const accountRecoveryRequested=location.hash==='#forgot-password';
-if(accountResetToken||accountRecoveryRequested)history.replaceState(null,'',location.pathname+location.search+'#ring');
+if(accountResetToken||accountActivationToken||accountRecoveryRequested)history.replaceState(null,'',location.pathname+location.search+'#ring');
 window.fetch=async function(input,options={}){
   const url=typeof input==='string'?input:input.url;
   if(['/api/arena','/api/social','/api/messages','/api/friends','/api/organisations','/api/grounds','/api/bookings','/api/tournaments'].some(path=>url.startsWith(path)))await accountReady;
@@ -35,7 +47,7 @@ async function accountRequest(path,payload){
   try{response=await nativeFetch('/api/auth/'+path,{method:payload?'POST':'GET',headers:{'Content-Type':'application/json','X-Dhoyo-Request':'1'},body:encrypted?JSON.stringify(encrypted):undefined});}
   catch{throw new Error('Could not reach the account service. Check your connection and try again.');}
   const value=await response.json().catch(()=>null);
-  if(!response.ok)throw new Error(value?.error||'The account service is temporarily unavailable. Try again.');
+  if(!response.ok){const error=new Error(value?.error||'The account service is temporarily unavailable. Try again.');error.response=value;throw error;}
   if(!value||typeof value!=='object')throw new Error('The account service returned an unexpected response. Try again.');
   return value;
 }
@@ -60,10 +72,11 @@ function accountIcon(name){
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]||paths.arrow}</svg>`;
 }
 function showAccountForm(mode='login',message='',notice=''){
+  if(accountSafeRoute(location.hash.slice(1)))accountReturnRoute=location.hash.slice(1);
   const register=mode==='register',forgot=mode==='forgot',code=mode==='code',reset=mode==='reset'||code;
   const path=forgot?'request-password-code':code?'reset-password-code':reset?'reset-password':mode;
   const title=register?'Join the game.':forgot?'Reset your password.':reset?'Choose a new password.':'Welcome back, player.';
-  const intro=register?'A new squad. A new story. It starts with you.':forgot?'Enter your account email. We’ll send a six-digit verification code.':code?'Enter the code from your email and choose a new password. The code expires in 10 minutes.':reset?'Use at least 10 characters, then sign in with your new password.':'Your squad is waiting. Let’s get you back in.';
+  const intro=register?'Complete your required details. We’ll email an activation link to confirm your account before you sign in.':forgot?'Enter your account email. We’ll send a six-digit verification code.':code?'Enter the code from your email and choose a new password. The code expires in 10 minutes.':reset?'Use at least 10 characters, then sign in with your new password.':'Your squad is waiting. Let’s get you back in.';
   const submitLabel=register?'Create my account':forgot?'Send verification code':reset?'Reset password':'Let’s play';
   document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
   let overlay=document.getElementById('account-screen');
@@ -98,6 +111,7 @@ function showAccountForm(mode='login',message='',notice=''){
         </div>
         <h2 id="account-title">${title}</h2>
         <p class="account-form-intro">${intro}</p>
+        ${mode==='login'||register?'<div class="account-google" hidden></div>':''}
         ${register?`<label for="account-type">Account type<select id="account-type" name="accountType"><option value="player" selected>Player — book grounds and join tournaments</option><option value="organisation">Organisation — manage grounds and tournaments</option></select></label><label for="account-organisation" class="account-organisation-field" hidden>Organisation name<input id="account-organisation" name="organisationName" autocomplete="organization" placeholder="Your organisation or club" maxlength="100" disabled></label><p class="account-role-note" hidden>Use your organisation’s email. Your name below identifies the administrator. Organisation accounts start unverified.</p><label for="account-name">Your name<input id="account-name" name="name" autocomplete="name" placeholder="What should we call you?" maxlength="100" required></label>`:''}
         ${reset?'':'<label for="account-email">Email address<input id="account-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@example.com" maxlength="254" required></label>'}
         ${code?'<label for="account-code">Verification code<input id="account-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6-digit code" required></label>':''}
@@ -109,6 +123,7 @@ function showAccountForm(mode='login',message='',notice=''){
         ${register||reset?'<small id="account-password-help" class="account-password-help">Use at least 10 characters.</small>':''}
         ${reset?'<label for="account-password-confirm">Confirm new password<input id="account-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></label>':''}
         ${register?`
+          <label for="account-phone">Phone number<input id="account-phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+91 98765 43210" maxlength="24" required aria-describedby="account-phone-help"></label><small id="account-phone-help" class="account-password-help">Include your country code. Your phone number stays private on your account.</small>
           <div class="account-location"><label for="account-city">City<input id="account-city" name="city" autocomplete="address-level2" placeholder="Your city" maxlength="80" required></label><label for="account-state">State / region<input id="account-state" name="state" autocomplete="address-level1" placeholder="Your state" maxlength="80" required></label></div>
           <div class="account-location"><label for="account-country">Country<input id="account-country" name="country" autocomplete="country-name" placeholder="Your country" maxlength="80" required></label><label for="account-sport">Your sport<select id="account-sport" name="sport">${['Football','Cricket','Basketball','Badminton','Tennis','Running','Esports','Swimming','Volleyball'].map(s=>`<option>${s}</option>`).join('')}</select></label></div>`:''}
         ${mode==='login'||reset?`<button type="button" class="account-forgot">${code?'Send a new code':reset?'Request a new reset link':'Forgot password? Reset password'}</button>`:''}
@@ -195,6 +210,13 @@ function showAccountForm(mode='login',message='',notice=''){
         accountRecoveryChallenge=result.challengeId;accountRecoveryEmail=payload.email;
         showAccountForm('code','',result.message);return;
       }
+      if(result.activationRequired){
+        const enteredEmail=result.email||payload.email||'';
+        const passwordField=form.querySelector('[name="password"]');if(passwordField)passwordField.value='';
+        if(window.DhoyoOnboarding)window.DhoyoOnboarding.pending(enteredEmail,result.message);
+        else showAccountForm('login','',result.message||'Check your email and activate your account before signing in.');
+        return;
+      }
       setAccountIdentity(result);
       await rememberAccountPassword(payload);
       // The authenticated credential has been handed to the browser's password
@@ -203,10 +225,13 @@ function showAccountForm(mode='login',message='',notice=''){
         const field=form.querySelector(`[name="${name}"]`);if(field)field.value='';
       }
       form.remove();
-      location.replace(account.accountType==='organisation'?'/ring#organisation':'/ring#ring');
+      location.replace(accountDestination());
     }
     catch(error){
-      form.querySelector('.account-error').textContent=error.message;
+      if(error.response?.activationRequired&&window.DhoyoOnboarding){
+        const passwordField=form.querySelector('[name="password"]');if(passwordField)passwordField.value='';
+        window.DhoyoOnboarding.pending(payload.email||'',error.message);
+      }else form.querySelector('.account-error').textContent=error.message;
     }
     finally{
       // Secrets are needed only for this request and optional browser saving.
@@ -216,12 +241,19 @@ function showAccountForm(mode='login',message='',notice=''){
       button.querySelector('span').textContent=submitLabel;
     }
   };
+  if(window.DhoyoOnboarding)window.DhoyoOnboarding.mount(overlay,mode);
   if(window.matchMedia('(min-width: 761px)').matches)overlay.querySelector('input').focus({preventScroll:true});
 }
 (async()=>{
+  if(accountActivationToken){
+    const token=accountActivationToken;accountActivationToken='';
+    if(window.DhoyoOnboarding)window.DhoyoOnboarding.activate(token);
+    else showAccountForm('login','Could not open account activation. Refresh this page.');
+    return;
+  }
   if(accountResetToken){showAccountForm('reset');return;}
   if(accountRecoveryRequested){showAccountForm('forgot');return;}
-  try{const result=await accountRequest('me');setAccountIdentity(result);if(!result.userId){showAccountForm();return;}
+  try{const result=await accountRequest('me');setAccountIdentity(result);if(!result.userId){showAccountForm(accountSignupRequested?'register':'login');return;}
     if(account.accountType==='organisation'&&(!location.hash||location.hash==='#ring'))history.replaceState(null,'',location.pathname+location.search+'#organisation');
     document.body.classList.remove('account-pending');
     document.querySelector('[data-bottom-route="profile"]').href='#player/'+encodeURIComponent(result.userId);
