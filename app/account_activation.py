@@ -5,7 +5,7 @@ import time
 
 from flask import Blueprint, jsonify, request
 
-from auth import digest, valid_email
+from auth import digest, valid_email, email_activation_bypass_enabled
 from password_reset import mail_settings, deliver_password_reset, log_mail_failure, configured_mail_provider
 
 account_activation = Blueprint('account_activation', __name__, url_prefix='/api/auth')
@@ -102,6 +102,16 @@ def resend_activation():
     if set(payload) != {'email'} or not valid_email(payload.get('email')):
         return jsonify(error='Enter a valid email address'), 400
     email = payload['email'].strip().casefold()
+    if email_activation_bypass_enabled():
+        with raw_state() as data:
+            if not reserve_limits(data, [('send-email:' + email, 3),
+                                         ('send-ip:' + (request.remote_addr or ''), 20)], time.time()):
+                return too_many()
+            account = data.get('accounts', {}).get(email)
+            if account and not account.get('email_verified', True):
+                account['email_verified'] = True
+                account['email_verified_at'] = int(time.time())
+        return jsonify(message='Testing mode is active. You can sign in now.')
     settings = activation_settings()
     if settings is None:
         return jsonify(error=UNAVAILABLE), 503
