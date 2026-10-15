@@ -85,6 +85,7 @@ document.addEventListener('click',async event=>{
   try{
     const result=await playRequest('tickets',{challenge:playState.challenge});
     if(request!==playState.request||owner!==account.userId||view!=='google-play')return;
+    if(result.currentUserId!==owner)throw new Error('Your account changed. Refresh this page before approving the connection.');
     if(!/^[A-Za-z0-9_-]{43}$/.test(result.ticket||''))throw new Error('Could not prepare your Android connection. Start again from the app.');
     playState.ticket=result.ticket;
   }catch(error){if(request===playState.request&&owner===account.userId)playState.error=error.message;}

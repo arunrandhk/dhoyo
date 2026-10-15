@@ -43,7 +43,7 @@ test('store links allow only real Google Play detail URLs',()=>{
 test('a native challenge requires an explicit approval before requesting a ticket',async()=>{
   const p=page();await Promise.resolve();fixture(p,true);
   const calls=[];
-  p.context.fetch=async(url,options)=>{calls.push({url,options});return response({ticket:'t'.repeat(43)});};
+  p.context.fetch=async(url,options)=>{calls.push({url,options});return response({ticket:'t'.repeat(43),currentUserId:'player-one'});};
   p.run("playState.challenge='c'.repeat(43);render()");
   assert.equal(calls.length,0);assert.match(p.node('#content').innerHTML,/Approve & continue in Android/);
   const button={dataset:{},hasAttribute:()=>false};
@@ -70,9 +70,18 @@ test('responses for a different browser account never show private connection da
 });
 test('switching identity invalidates an in-flight approval ticket',async()=>{
   const p=page();await Promise.resolve();fixture(p,true);const wait=deferred();
-  p.context.fetch=async()=>{await wait.promise;return response({ticket:'t'.repeat(43)});};
+  p.context.fetch=async()=>{await wait.promise;return response({ticket:'t'.repeat(43),currentUserId:'player-one'});};
   p.run("playState.challenge='c'.repeat(43)");
   const approval=p.listeners.get('click')({target:{closest:()=>({dataset:{},hasAttribute:()=>false})},preventDefault(){}});
   await Promise.resolve();p.run("account.userId='player-two';render()");wait.resolve();await approval;
   assert.equal(p.run('playState.ticket'),'');assert.doesNotMatch(p.node('#content').innerHTML,/ticket=/);
+});
+test('a cookie changed in another tab cannot approve a different account under the old name',async()=>{
+  const p=page();await Promise.resolve();fixture(p,true);
+  p.context.fetch=async()=>response({ticket:'t'.repeat(43),currentUserId:'player-two'});
+  p.run("playState.challenge='c'.repeat(43)");
+  await p.listeners.get('click')({target:{closest:()=>({dataset:{},hasAttribute:()=>false})},preventDefault(){}});
+  assert.equal(p.run('playState.ticket'),'');
+  assert.match(p.node('#content').innerHTML,/Your account changed/);
+  assert.doesNotMatch(p.node('#content').innerHTML,/ticket=/);
 });

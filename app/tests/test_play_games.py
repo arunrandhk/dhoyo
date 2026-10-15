@@ -57,6 +57,7 @@ def approval(player, verifier=None):
     response = post(player['client'], BASE + 'tickets', {'challenge': play_games.pkce_challenge(verifier)})
     assert response.status_code == 200, response.json
     assert response.json['expiresIn'] == 300
+    assert response.json['currentUserId'] == player['userId']
     return dict(ticket=response.json['ticket'], verifier=verifier, serverAuthCode=SERVER_CODE)
 
 
@@ -81,6 +82,7 @@ def test_config_public_safe_optional_store_link_and_status_private(configured):
     ('PLAY_GAMES_WEB_CLIENT_ID', None), ('PLAY_GAMES_WEB_CLIENT_ID', 'bad-client'),
     ('PLAY_GAMES_WEB_CLIENT_SECRET', None), ('PLAY_GAMES_WEB_CLIENT_SECRET', 'bad\nsecret'),
     ('PLAY_GAMES_APPLICATION_ID', None), ('PLAY_GAMES_APPLICATION_ID', '../wrong'),
+    ('PLAY_GAMES_APPLICATION_ID', '0'), ('PLAY_GAMES_APPLICATION_ID', '012345'),
     ('PLAY_GAMES_ACHIEVEMENTS_JSON', '{bad'), ('PLAY_GAMES_ACHIEVEMENTS_JSON', '[]'),
     ('PLAY_GAMES_ACHIEVEMENTS_JSON', '{"unknown":"achievement_id"}'),
     ('PLAY_GAMES_ACHIEVEMENTS_JSON', '{"first-team":"../inject"}'),

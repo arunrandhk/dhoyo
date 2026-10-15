@@ -78,7 +78,7 @@ def settings():
     client_secret = setting('PLAY_GAMES_WEB_CLIENT_SECRET')
     leaderboard = setting('PLAY_GAMES_LEADERBOARD_ID') or None
     raw_map = setting('PLAY_GAMES_ACHIEVEMENTS_JSON', '{}')
-    if (not isinstance(application_id, str) or not re.fullmatch(r'[0-9]{1,30}', application_id)
+    if (not isinstance(application_id, str) or not re.fullmatch(r'[1-9][0-9]{0,29}', application_id)
             or not isinstance(client_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]+\.apps\.googleusercontent\.com', client_id)
             or not isinstance(client_secret, str) or not 1 <= len(client_secret) <= 2048
             or any(character.isspace() for character in client_secret)
@@ -196,7 +196,7 @@ def tickets():
         ticket = secrets.token_urlsafe(32)
         records[digest(ticket)] = dict(user_id=user_id, challenge=challenge,
             session_digest=session_digest, expires=timestamp + TICKET_LIFETIME)
-    return private(jsonify(ticket=ticket, expiresIn=TICKET_LIFETIME))
+    return private(jsonify(ticket=ticket, expiresIn=TICKET_LIFETIME, currentUserId=user_id))
 
 
 def valid_challenge(challenge):

@@ -1,6 +1,6 @@
 # Google Play and Play Games setup
 
-This repository prepares an Android application and a separate Google Play Games Services (PGS) connection. It does not create a Play Console listing, buy an organisation account, publish a release or invent Google project IDs. Production setup belongs to the organisation that will own the application.
+This repository contains an Android application and a separate Google Play Games Services (PGS) connection. A test APK has been built and checked as described below. It does not create a Play Console listing, buy an organisation account, publish a release or invent Google project IDs. Production setup belongs to the organisation that will own the application.
 
 Google Play distributes Android apps. PGS supplies gaming identity, achievements and leaderboards for Android games; it does not replace Dhoyo's activated accounts or required profile form. A sports booking/tournament management website is not automatically a game because it has badges. Assess the actual product against Google's current game requirements before enabling PGS. This is an integration limitation inferred from Google's game-specific documentation. Dhoyo's own rankings and badges remain available independently. [PGS overview](https://developer.android.com/games/pgs/overview), [Android game server support](https://developer.android.com/games/pgs/android/server-access).
 
@@ -109,6 +109,29 @@ export GRADLE_USER_HOME=/tmp/dhoyo-android-tools/gradle-user-home
 "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;35.0.0' 'platform-tools'
 ```
 
-The first command displays Google's agreements for the operator to review. This work does not silently answer yes or claim those agreements were accepted. Package installation and a complete APK/AAB build remain dependent on any outstanding licence acceptance and successful downloads. [SDK manager and licence acceptance](https://developer.android.com/tools/sdkmanager).
+The first command displays Google's agreements for the operator to review. In this session, the initial install stopped at the licence prompt. The owner then explicitly authorised **“Accept the SDK terms and build the test app”**. Only the reviewed Android SDK License Agreement was accepted for the three targeted packages above; unrelated SDK agreements were not accepted. A fresh environment still needs its operator's licence review. [SDK manager and licence acceptance](https://developer.android.com/tools/sdkmanager), [Android SDK terms](https://developer.android.com/studio/terms).
+
+The targeted SDK installation completed successfully: platform `android-36` revision 2, Build Tools 35.0.0 and Platform Tools 37.0.1 are installed under the temporary SDK directory. Download checksum records are in `/tmp/dhoyo-android-tools/verified-downloads.json`; the targeted install log is `/tmp/dhoyo-android-tools/sdk-install-authorized.log`.
 
 From the repository's Android directory, use the checked-in Gradle wrapper to run assembly, unit tests, lint and release bundle generation. See `android/README.md` for the exact public configuration properties and signing environment expected by the final Android project. A debug APK is for testing, and an unsigned release bundle cannot be uploaded as a production release. Device testing and live PGS connection still require a correctly configured project, compatible Android device/Google Play services, authorised tester and valid credentials.
+
+## Verified test build
+
+On 15 October 2026, the official checked-in wrapper completed these tasks successfully with the installed tools:
+
+```sh
+cd android
+./gradlew --no-daemon :app:assembleDebug :app:testDebugUnitTest :app:lintDebug
+```
+
+The build executed 50 tasks, passed all 4 JUnit tests, and completed lint with **0 errors and 3 warnings**. The warnings concern the pinned Gradle version, Android 12 data-extraction rules and a monochrome round launcher icon. The unit tests cover PKCE and callback/origin validation. This was a compiled test build, not a device instrumentation test or a live Google project connection.
+
+The debug APK is available at `/tmp/dhoyo-android-artifacts/app-debug.apk` (3,289,275 bytes). Its SHA-256 is:
+
+```text
+b4a66c7c599445d5493f817045fc07782c2d279364e028f9107f6195def41f94
+```
+
+Build output, the JUnit report and the lint HTML report are in the same temporary artifacts directory. The APK has a valid Android debug signature. The merged and packaged manifests were inspected to confirm the PGS library's automatic initialization provider was removed; the application's guarded initialization keeps PGS disabled while game IDs are blank.
+
+The test build opens `https://byte-ring-demo.onrender.com` for the website. Deploy the new backend there and supply the organisation's real PGS configuration before testing the complete native/browser/server linking flow. No Play Console publication or production-signed release bundle was performed.
