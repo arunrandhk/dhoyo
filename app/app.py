@@ -5,6 +5,7 @@ from social import social
 from arena import arena
 from messages import messages
 from friends import friends
+from organisations import organisations
 from db import (
     initialize_database,
     test_database_connection,
@@ -20,13 +21,31 @@ app.register_blueprint(social)
 app.register_blueprint(arena)
 app.register_blueprint(messages)
 app.register_blueprint(friends)
-from auth import install_auth
+app.register_blueprint(organisations)
+from auth import install_auth, render_terminates_tls, secure_transport
 install_auth(app)
+
+
+@app.before_request
+def protect_sign_in_page():
+    if request.path in ('/ring', '/sportspace', '/static/sportspace/index.html') and not secure_transport():
+        return 'Open this page over HTTPS to sign in.', 403
+
 
 @app.after_request
 def fresh_frontend(response):
     if request.path.startswith(("/static/", "/api/")):
         response.headers["Cache-Control"] = "no-store"
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; connect-src 'self'; object-src 'none'; "
+        "base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
+    )
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    if request.is_secure or render_terminates_tls():
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000'
     return response
 
 

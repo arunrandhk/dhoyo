@@ -33,29 +33,53 @@ def test_packaged_application_starts_and_serves_account_features(tmp_path):
     runtime.mkdir()
     dockerfile = Path(__file__).resolve().parents[1] / 'Dockerfile'
     copy_container_sources(dockerfile, runtime)
-    environment = dict(os.environ, SPORTSPACE_SOCIAL_DB=str(tmp_path / 'container-state.sqlite'))
+    environment = dict(os.environ, SPORTSPACE_SOCIAL_DB=str(tmp_path / 'container-state.sqlite'),
+                       AUTH_ALLOW_INSECURE_LOCAL='1')
     script = textwrap.dedent('''
         import os
         import sys
+        from datetime import datetime, timedelta, timezone
         sys.path.insert(0, os.getcwd())
         from app import app
 
         app.config['AUTH_TEST_DEMO'] = False
+        # Domain smoke checks use the same explicit plaintext fixture opt-in as
+        # the API tests; credential encryption has its own strict regression suite.
+        app.config.update(TESTING=True, AUTH_TEST_ALLOW_PLAINTEXT=True)
         headers = {'X-Dhoyo-Request': '1'}
         owner, peer = app.test_client(), app.test_client()
         assert owner.get('/health').status_code == 200
         assert owner.get('/api/friends').status_code == 401
 
-        def register(client, name):
+        def register(client, name, **options):
             response = client.post('/api/auth/register', headers=headers, json=dict(
                 name=name, email=name.lower() + '@example.com', password='container-test-password',
-                sport='Football', city='Delhi', state='Delhi', country='India'))
+                sport='Football', city='Delhi', state='Delhi', country='India', **options))
             assert response.status_code == 201, response.get_data(as_text=True)
             return response.json['userId']
 
         owner_id, peer_id = register(owner, 'Owner'), register(peer, 'Peer')
+        assert peer.get('/api/tournaments').status_code == 200
+
+        organiser = app.test_client()
+        register(organiser, 'Organiser', accountType='organisation', organisationName='Test Sports')
+        starts = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+        response = organiser.post('/api/tournaments', headers=headers, json=dict(
+            name='Packaged Cup', sport='Football', eventType='online',
+            startsAt=starts.isoformat(), timezone='UTC', durationHours=2,
+            registrationClosesAt=(starts - timedelta(hours=1)).isoformat(), capacity=2,
+            teamSize=1, playerEmailConfirmation='activation_link', publish=True))
+        assert response.status_code == 201, response.get_data(as_text=True)
+        registration_url = '/api/tournaments/' + response.json['tournament']['id'] + '/registrations'
+        response = owner.post(registration_url, headers=headers, json=dict(
+            teamName='First Team', playerEmails=[dict(email='peer@example.com')]))
+        assert response.status_code == 201, response.get_data(as_text=True)
+        assert peer.get('/api/tournaments').json['tournaments'][0]['isParticipant'] is True
+        response = peer.post(registration_url, headers=headers, json=dict(teamName='Second Team'))
+        assert response.status_code == 409, response.get_data(as_text=True)
+
         assert owner.get('/api/friends').json['friends'] == []
-        assert owner.get('/api/friends/players').json['players'][0]['id'] == peer_id
+        assert any(player['id'] == peer_id for player in owner.get('/api/friends/players').json['players'])
         response = owner.patch('/api/arena/players/' + owner_id,
                                headers=headers, json={'photoPrivacy': 'friends'})
         assert response.status_code == 200, response.get_data(as_text=True)
@@ -80,7 +104,8 @@ def test_packaged_application_starts_and_serves_account_features(tmp_path):
         # Invalid input exercises recovery registration without sending any email.
         response = owner.post('/api/auth/request-password-code', headers=headers, json={})
         assert response.status_code == 400 and 'email' in response.json['error'].lower()
-        for path in ('/static/sportspace/friends.js', '/static/sportspace/account-security.js'):
+        for path in ('/static/sportspace/friends.js', '/static/sportspace/account-security.js',
+                     '/static/sportspace/organisations.js'):
             response = owner.get(path)
             assert response.status_code == 200 and len(response.data) > 100, path
         print('Packaged application startup and account features passed')

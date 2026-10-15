@@ -13,14 +13,31 @@ Posts, stories and comments use the signed-in author's identity. Other accounts
 cannot edit your profile. Historical demo players remain as sample content and
 cannot be claimed through registration.
 
+Choose **Home → Edit profile** or **Profile → Edit profile** to update your own
+name, location, sport, bio and photo privacy. The form saves through the profile
+API to the same database used by your account; reloading retrieves those saved
+details. Profile edit controls appear before the connection map.
+
+Regular player accounts discover published tournaments under **Tournaments**.
+After registering a team, **Edit registration** updates its name before the
+registration deadline. The saved entry appears in **Saved & activity**, and
+only its registering player can edit it. Draft tournaments remain private to
+the organisation that created them until published. See
+[database verification](sportspace-database.md) to inspect saved records.
+
 Login and sign-up use password-manager autocomplete hints. After successful
 authentication, supported browsers on HTTPS (or localhost) receive a request to
 save the submitted credentials through their own password manager. Browser settings
 and user choice control saving; unsupported browsers use the normal form and
 navigation signals. Declining or failing to save a password still completes sign-in.
 
+Browser credential requests are encrypted before transmission; see
+[encrypted account payloads](auth-payload-encryption.md) for the wire format,
+one-use challenges and browser visibility limits. Names, emails and passwords
+are not placed in session-token claims.
+
 Passwords use Werkzeug scrypt hashes. Session cookies are HttpOnly and SameSite=Lax;
-the database stores hashes of opaque session tokens, expires them after seven days,
+the database stores hashes of session tokens, expires them after seven days,
 and revokes them on logout. JSON mutations require the X-Dhoyo-Request header and
 reject cross-origin requests. The old demo organizer header grants no permissions.
 For an HTTPS deployment, set AUTH_COOKIE_SECURE=1 (especially behind a TLS proxy).

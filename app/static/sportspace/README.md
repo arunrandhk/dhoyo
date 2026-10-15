@@ -35,6 +35,8 @@ Run the Flask server to use the arena, player rankings and persistent social API
 cd /root/byte-devops
 python3 -m venv .venv
 .venv/bin/python -m pip install -r app/requirements.txt
+export AUTH_ALLOW_INSECURE_LOCAL=1
+export AUTH_JWT_SECRET="$(.venv/bin/python -c 'import secrets; print(secrets.token_hex(32))')"
 cd app
 SPORTSPACE_SOCIAL_DB=/tmp/dhoyo-local.sqlite3 ../.venv/bin/python -m flask --app app run --port 8002
 ```
@@ -71,8 +73,70 @@ the profile and sports activity and signs out the account's old sessions.
 with their current password, or request a recovery code. Email delivery requires
 a configured sender; see the [Gmail and other sender setup](../../../docs/password-reset.md).
 
-Booking and tournament activity remains browser-local under `sportspace-v1`.
-There are no payments, shared booking inventory, or real event registrations.
+Organisation grounds, bookings, tournaments and team registrations persist in
+the same database as accounts. Organisations create grounds and tournaments from
+their dashboard. Choose **Publish for players** to make a new tournament visible
+to regular accounts immediately, or **Save draft** to prepare it privately.
+Existing drafts can be published from **Organisation → Your tournaments**.
+Players can register a team from **Tournaments** and edit their team name before
+registration closes; their registration also appears in **Saved & activity**.
+New tournament forms enable **Require a verified email for every player** by default. The
+captain enters one email for each player in the configured team size, sends a
+six-digit verification code to each address and verifies every code before
+registering. **Send all codes** sends each player's own code separately. Changing
+an email requires a new code for that address. Saved verified addresses remain
+verified when the captain only edits the team name, answers or note.
+Player emails are private to the captain and the owning organisation's **View
+teams** roster. Existing tournaments keep their previous registration behavior
+unless email verification is enabled on a draft. Delivery uses the configured
+Gmail, Resend or SMTP sender; see [tournament email verification](../../../docs/tournament-email-verification.md).
+When verification is optional, the captain can leave every email blank or add
+and verify up to the configured number of player addresses.
+Tournament forms include description, format, team size, entry fee, prizes,
+eligibility, rules, organiser contact and online platform. **Add custom detail**
+lets organisers add their own event information. **Add registration question**
+lets them request text or choice answers, optionally required. Players answer
+those questions and can add a note of their own; answers and notes are private
+to the registering player and the organisation's roster. **View details** shows
+the complete public event information. **Edit details** lets organisers update
+upcoming published events without changing their booking or registration setup.
+Ground setup includes a description, surface, player capacity, amenities, rules,
+organiser contact, custom details and booking questions in the existing compact
+dialog. Players see the complete public ground details before reserving an
+hourly slot. Their answers and optional notes stay private to the booking player
+and the organisation.
+
+Both grounds and tournaments include payment method, payment instructions and
+cancellation/refund terms. Grounds specify the hourly rate and a refundable
+deposit; booking confirmation shows both amounts and the total. Tournaments
+specify an entry fee per team and a cash prize pool. Bookings and registrations
+save their agreed amounts and terms, so later listing edits do not change those
+records. Payments are made directly to the organiser; the app records payments
+and refunds but does not process or transfer money.
+The booking form loads current pricing and questions from availability. If a
+venue changes its price or booking terms before confirmation, the booking is
+stopped and the form refreshes for the player to review and choose a slot again.
+
+Organisation owners use **Record payment** on a reservation or in **View teams**
+to mark received money and save an optional reference. Cancelling a paid booking
+or registration leaves a **Refund due** record; **Record refund** marks the money
+as returned. Once a paid ground booking has ended, **Record deposit refund**
+records the returned deposit while retaining the paid ground hire. The
+workspace's **Overview → Payment totals**, inside the existing upcoming ground
+hire panel, expands to show received and outstanding ground payments, tournament
+entry payments, pending cancellation refunds, and deposits awaiting return after
+play. Cancellation tracking retains the full paid
+amount as refund due until the owner records a completed refund; the setup form
+explains this convention alongside the organiser's policy. Players can
+view their own payment status but cannot change it.
+Cancelled tournament registrations remain in **Past entries & refunds** in
+player activity so their payment and refund status can still be checked.
+Use **Profile → Edit profile** to update your own
+details. See [database verification](../../../docs/sportspace-database.md) for a
+read-only check of saved tournament, registration and profile records.
+Physical tournaments and player bookings share the saved ground availability.
+An organisation's reservation of its own ground for a physical tournament does
+not count as a player payment.
 Sample images load from Unsplash and require internet access. Uploaded raster
 photos are stored with the demo state. Sample venues, people and
 events are illustrative. Lucide icons are bundled locally with their license.
@@ -112,8 +176,8 @@ Sample profiles remain public. Text posts and sporting results remain visible. S
 protect the feed, profiles, stories and directory avatars. Friendship changes
 clear loaded photos and reload the allowed content.
 
-The full connection map appears at the top of Home and as the first section of every
-profile, before the player stats, photos and stories. The separate
+The full connection map appears on Home and on every profile. Profile details
+and edit controls come first, followed by connections, photos and stories. The separate
 Connections navigation item and profile tab have been removed. A fixed bottom
 bar provides Home, Explore, Share, Saved and Profile on desktop and mobile.
 Profiles have Moments, Matches, Rank & awards and Photos sections.
@@ -289,12 +353,15 @@ whose sport matches the post; the server records that Arena's city. Arena pages
 use this association to keep their highlights together. Communities are public;
 joining is not required to post in this demo.
 
-Remaining backend work:
+Remaining service work:
 
 | Service | Suggested endpoints | Responsibility |
 | --- | --- | --- |
 | Social | Extend `/api/social` | Real accounts, uploads, moderation, production persistence |
-| Booking | `/api/grounds`, `/api/grounds/:id/availability`, `/api/bookings` | Inventory, reservations, cancellations |
-| Tournaments | `/api/tournaments`, `/api/tournaments/:id/registrations` | Teams, registration, schedules, brackets and results |
+| Booking | Extend `/api/grounds` and `/api/bookings` | Multiple bookable resources per venue, payment processing and reconciliation |
+| Tournaments | Extend `/api/tournaments` | Match schedules, brackets, scoring and results |
 
-Use a shared identity provider and enforce ownership and roles on the server. Ground availability must be checked and reserved atomically in the booking database; this prototype only prevents conflicting slots within its own browser state. The tournament demo covers registration only; scoring and bracket management still need implementation. Avoid collecting real personal data in this demo.
+Ground availability checks and reservations run atomically in the shared database
+transaction. Authenticated account roles and resource ownership are enforced on
+the server, along with conflicting bookings, duplicate registrations and team
+capacity. Tournament scoring and bracket management still need implementation.

@@ -278,7 +278,8 @@ def manage_members(team_id, request_id=None):
 
 @arena.post('/awards')
 def award():
-    if request.headers.get('X-Demo-Role') != 'organizer':
+    from auth import test_demo_enabled
+    if not test_demo_enabled() or request.headers.get('X-Demo-Role') != 'organizer':
         return jsonify(error='Demo organizer role required'), 403
     payload = body()
     tier, count = payload.get('tier'), payload.get('count')

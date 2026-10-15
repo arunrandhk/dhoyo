@@ -1,5 +1,10 @@
 # Arena background
 
+The `fonts/` directory bundles the Ubuntu Sans variable font for consistent
+typography without an external font service. It supports weight and width
+variations. The font is distributed under the Ubuntu Font Licence; its
+copyright notice and full license are included in `fonts/LICENSE.txt`.
+
 `game-arena.webp` is an original background generated with the built-in imagegen
 tool for the dhoyo login and community frontend. The PNG was encoded as WebP at
 quality 0.88 using browser canvas. The shipped asset is 1672 × 941 pixels and

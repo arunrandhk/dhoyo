@@ -326,3 +326,7 @@ body.account-visible { overflow: hidden; }
   #account-screen *, #account-screen *::before { transition: none; animation: none; }
   .account-submit:hover svg { transform: none; }
 }
+
+/* Account state and organisation sign-up fields use the existing access layout. */
+#account-screen [hidden] { display: none !important; }
+#account-screen .account-role-note { margin: 12px 0 0; color: #aebec7; font-size: 11px; line-height: 1.6; }

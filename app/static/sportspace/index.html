@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>dhoyo | Your people. Your game.</title>
+  <meta name="description" content="Find your sporting community, share your highlights, and make room for your next game. Welcome to dhoyo.">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="social.css">
   <link rel="stylesheet" href="arena.css">
@@ -17,8 +18,10 @@
   <link rel="stylesheet" href="messages.css">
   <link rel="stylesheet" href="stickers.css">
   <link rel="stylesheet" href="friends.css">
+  <link rel="stylesheet" href="organisations.css">
   <script src="stickers.js" defer></script>
   <script src="auth-ui.js" defer></script>
+  <script src="auth-encryption.js" defer></script>
   <script src="app.js" defer></script>
   <script src="social.js" defer></script>
   <script src="arena.js" defer></script>
@@ -30,12 +33,14 @@
   <script src="stickers-ui.js" defer></script>
   <script src="friends.js" defer></script>
   <script src="account-security.js" defer></script>
+  <script src="organisations.js" defer></script>
 </head>
 <body class="account-pending">
   <aside class="sidebar">
-    <a class="brand" href="#ring"><span class="brand-mark">D</span> dhoyo<span class="ring-wordmark-dot">.</span></a>
+    <a class="brand" href="#ring" aria-label="dhoyo home"><span class="brand-mark" aria-hidden="true">D</span> dhoyo<span class="ring-wordmark-dot">.</span></a>
     <div class="workspace-label">YOUR SPORTING UNIVERSE</div>
     <nav aria-label="Main navigation">
+      <button data-org-route="organisation" hidden><img class="nav-icon" src="icons/trophy.svg" alt=""> Organisation dashboard</button>
       <button data-ring-route="ring"><img class="nav-icon" src="icons/house.svg" alt=""> Social feed</button>
       <button data-ring-route="connections"><img class="nav-icon" src="icons/users.svg" alt=""> Connections</button>
       <button data-ring-route="discover"><img class="nav-icon" src="icons/compass.svg" alt=""> Discover Arenas</button>
@@ -53,7 +58,7 @@
       <div class="filters" id="filters" role="group" aria-label="Filter by sport"></div>
       <div id="content"></div>
     </main>
-    <footer>dhoyo / MADE FOR THE GAME <span id="connection-status">Demo account</span></footer>
+    <footer>dhoyo / MADE FOR THE GAME <span id="connection-status">Connecting to your account…</span></footer>
   </div>
   <nav class="app-bottom-nav" aria-label="App navigation">
     <a href="#ring" data-bottom-route="ring"><img src="icons/house.svg" alt=""><span>Home</span></a>

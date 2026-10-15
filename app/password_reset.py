@@ -131,6 +131,17 @@ def check_mail(legacy_links):
 
 
 def email_text(settings, token):
+    if settings.get('purpose') == 'tournament_activation':
+        return ('Your captain invited you to participate in "' + settings['tournament_name'] +
+                '" with team "' + settings['team_name'] + '".\n\n' +
+                'Open this link and select Acknowledge participation:\n\n' + token +
+                '\n\nThis link expires in 24 hours. Ignore it if you do not recognise this team.\n')
+    if settings.get('purpose') == 'tournament_player':
+        return ('Your 6-digit Dhoyo tournament email verification code is:\n\n' + token +
+                '\n\nUse this code to verify your player email for participation in "' +
+                settings['tournament_name'] + '". '
+                'It expires in 10 minutes and can be used once. '
+                'If you did not request this verification, you can ignore this email.\n')
     if settings.get('purpose') == 'code':
         return ('Your Dhoyo password reset code is:\n\n' + token +
                 '\n\nEnter this code on the password reset screen. '
@@ -143,6 +154,10 @@ def email_text(settings, token):
 
 
 def email_subject(settings):
+    if settings.get('purpose') == 'tournament_activation':
+        return 'Acknowledge your Dhoyo tournament participation'
+    if settings.get('purpose') == 'tournament_player':
+        return 'Verify your Dhoyo tournament player email'
     return 'Your Dhoyo password reset code' if settings.get('purpose') == 'code' else 'Reset your Dhoyo password'
 
 
@@ -258,6 +273,12 @@ def deliver_password_reset(settings, recipient, token):
         return True, False
     finally:
         connection.close()
+
+
+def deliver_tournament_player_code(settings, recipient, code, tournament_name):
+    """Reuse the configured mail transport for tournament participation codes."""
+    tournament_settings = dict(settings, purpose='tournament_player', tournament_name=tournament_name)
+    return deliver_password_reset(tournament_settings, recipient, code)
 
 
 def cleanup(data, now):

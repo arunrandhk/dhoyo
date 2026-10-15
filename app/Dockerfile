@@ -16,7 +16,8 @@ RUN pip install \
 
 COPY app.py .
 COPY db.py .
-COPY social.py arena.py geography.py auth.py messages.py friends.py password_reset.py privacy.py ./
+COPY social.py arena.py geography.py auth.py messages.py friends.py password_reset.py privacy.py organisations.py ./
+COPY auth_envelope.py tournament_verification.py tournament_activation.py ./
 COPY start.sh .
 COPY static ./static
 

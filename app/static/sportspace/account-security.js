@@ -26,10 +26,12 @@
       form.querySelectorAll('input, button').forEach(node => { node.disabled = true; });
       const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 15000);
       try {
+        requireAccountSecureTransport();
+        const encrypted=await encryptAccountPayload('change-password',{currentPassword:values.currentPassword,password:values.password});
         const response = await fetch('/api/auth/change-password', {
           method: 'POST', signal: controller.signal,
           headers: {'Content-Type': 'application/json', 'X-Dhoyo-Request': '1'},
-          body: JSON.stringify({currentPassword: values.currentPassword, password: values.password})
+          body: JSON.stringify(encrypted)
         });
         const result = await response.json().catch(() => null);
         if (response.status === 401) { account.userId = null; showAccountForm('login', 'Your session has expired. Sign in again.'); return; }
@@ -41,6 +43,9 @@
       } catch (problem) {
         if (signedIn() && account.userId === userId && dialog.open) error.textContent = problem.name === 'AbortError' ? 'The request timed out. Please try again.' : problem instanceof TypeError ? 'Could not connect. Check your connection and try again.' : problem.message;
       } finally {
+        delete values.currentPassword;
+        delete values.password;
+        delete values.passwordConfirm;
         clearTimeout(timeout);
         busy = false;
         form.setAttribute('aria-busy', 'false');

@@ -59,15 +59,18 @@ def register(client, email='alex@gmail.com'):
 
 
 def request_code(client, email='alex@gmail.com', **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/request-password-code', json={'email': email}, headers=HEADERS, **kwargs)
 
 
 def reset(client, challenge, code='001234', password=NEW_PASSWORD, **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/reset-password-code', json={
         'challengeId': challenge, 'code': code, 'password': password}, headers=HEADERS, **kwargs)
 
 
 def login(client, password=PASSWORD, email='alex@gmail.com', **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/login', json={'email': email, 'password': password}, headers=HEADERS, **kwargs)
 
 

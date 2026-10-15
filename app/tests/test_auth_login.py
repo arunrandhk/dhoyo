@@ -59,12 +59,14 @@ def test_account_and_password_survive_a_fresh_application_process(clients):
 import json
 from app import app
 app.config['AUTH_TEST_DEMO'] = False
+app.config['TESTING'] = True
+app.config['AUTH_TEST_ALLOW_PLAINTEXT'] = True
 client = app.test_client()
 login = client.post('/api/auth/login', json={
     'email': 'player@example.com', 'password': 'my-long-password'
-}, headers={'X-Dhoyo-Request': '1'})
+}, headers={'X-Dhoyo-Request': '1'}, base_url='https://localhost')
 assert login.status_code == 200
-assert client.get('/api/auth/me').json['userId'] == login.json['userId']
+assert client.get('/api/auth/me', base_url='https://localhost').json['userId'] == login.json['userId']
 print(json.dumps(login.json))
 """
     result = subprocess.run(

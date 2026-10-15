@@ -17,6 +17,12 @@ services:
         value: "5432"
       - key: PGSSLMODE
         value: require
+      # One private signing key shared by every worker. Existing manually created
+      # services must add AUTH_JWT_SECRET in Environment before deploying.
+      - key: AUTH_JWT_SECRET
+        generateValue: true
+      - key: AUTH_COOKIE_SECURE
+        value: "1"
       - key: DB_HOST
         sync: false
       - key: DB_NAME

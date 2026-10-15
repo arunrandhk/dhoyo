@@ -54,14 +54,17 @@ def register(client, email='alex@example.com'):
 
 
 def forgot(client, email='alex@example.com', **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/forgot-password', json={'email': email}, headers=HEADERS, **kwargs)
 
 
 def reset(client, token, password='a-new-password', **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/reset-password', json={'token': token, 'password': password}, headers=HEADERS, **kwargs)
 
 
 def login(client, password=PASSWORD, **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/login', json={'email': 'alex@example.com', 'password': password}, headers=HEADERS, **kwargs)
 
 

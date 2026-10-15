@@ -163,7 +163,7 @@ playerPage=function(){
   const connections=hubProfileConnections(p,data);
   const fullPhotoHTML=photosHidden?hubPrivatePhotos():`<div class="hub-cover">${fullPhoto?`<button type="button" data-hub-photo="${escape(id)}" aria-label="Open full photo of ${escape(p.name)}"><img src="${escape(fullPhoto)}" alt="${escape(p.name)}'s ${p.cover||p.avatar?'profile photo':'sporting moment'}"></button>`:'<div class="hub-no-photo">YOUR GAME. YOUR STORY.</div>'}<span class="hub-cover-label">${escape(p.state||p.city)} / ${escape(p.country)}</span></div>`;
   const back='<a class="back-link" href="#ring">← Back to your feed</a>';
-  if(!data)return back+connections+header+tabs+(error?`<div class="arena-error" role="alert">${escape(error)} <button type="button" data-hub-retry="${escape(id)}">Retry profile</button></div>`:'<p role="status" class="hub-empty">Loading this player’s connections and activity…</p>');
+  if(!data)return back+header+connections+tabs+(error?`<div class="arena-error" role="alert">${escape(error)} <button type="button" data-hub-retry="${escape(id)}">Retry profile</button></div>`:'<p role="status" class="hub-empty">Loading this player’s connections and activity…</p>');
   let content;
   if(tab==='matches')content=hubMatches(data);
   else if(tab==='awards')content=hubRankDetails(p,data);
@@ -171,7 +171,7 @@ playerPage=function(){
     const photos=[...(fullPhoto?[{image:fullPhoto,text:'Profile photo',profile:true}]:[]),...data.posts.filter(post=>post.image),...data.stories];
     content=photosHidden?hubPrivatePhotos():`<h2>Photos & sporting moments</h2><div class="hub-gallery">${photos.map((photo,i)=>`<button type="button" data-hub-gallery="${i}" data-hub-player="${escape(id)}"><img src="${escape(photo.image)}" alt="${escape(photo.text||photo.sport||'Photo')}" loading="lazy"><span>${escape(photo.text||photo.sport||'Photo')}</span></button>`).join('')||hubEmpty('No photos yet. Upload a full profile photo or share a story.')}</div>`;
   }else content=fullPhotoHTML+(photosHidden?'':hubProfileStories(p,data))+`<div class="hub-section-heading"><h2>Moments shared by ${escape(p.name)}</h2></div>`+data.posts.map(post=>postHTML({...post,time:relativeTime(post.time),likes:post.likes-Number(post.liked)})).join('')+(data.posts.length?'':hubEmpty('No posts shared yet.'));
-  return back+connections+header+tabs+`<section class="hub-content">${content}</section>`;
+  return back+header+connections+tabs+`<section class="hub-content">${content}</section>`;
 };
 
 function hubMatchDetails(id){
@@ -251,7 +251,8 @@ render=function(){
   const me=arenaPlayer(arena.data?.currentUserId);
   if(me){
     document.querySelector('.sidebar-bottom strong').textContent=me.name;
-    document.querySelector('.sidebar-bottom small').textContent='Your player account';
+    document.querySelector('.sidebar-bottom small').textContent='Your player profile ↗';
+    document.querySelector('.sidebar-bottom').href=hubPlayerURL(me.id);
     document.querySelectorAll('.avatar.mine').forEach(el=>el.innerHTML=me.avatar?`<img src="${escape(me.avatar)}" alt="Your profile photo">`:escape(me.initials));
     document.querySelector('[data-bottom-route="profile"]').href=hubPlayerURL(me.id);
     $('#connection-status').textContent='Signed in as '+me.name;

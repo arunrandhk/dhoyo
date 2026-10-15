@@ -2,25 +2,37 @@
 const nativeFetch=window.fetch.bind(window);
 let releaseAccount;
 const accountReady=new Promise(resolve=>releaseAccount=resolve);
-const account={userId:null};
+const account={userId:null,name:'',accountType:'player',organisationId:null};
+function setAccountIdentity(value){
+  account.userId=value.userId||null;
+  account.name=value.name||'';
+  account.accountType=value.accountType==='organisation'?'organisation':'player';
+  account.organisationId=value.organisationId||null;
+}
 let accountResetToken=new URLSearchParams(location.hash.slice(1)).get('reset-token')||'';
 let accountRecoveryChallenge='',accountRecoveryEmail='',accountRecoveryReturnToProfile=false;
 const accountRecoveryRequested=location.hash==='#forgot-password';
 if(accountResetToken||accountRecoveryRequested)history.replaceState(null,'',location.pathname+location.search+'#ring');
 window.fetch=async function(input,options={}){
   const url=typeof input==='string'?input:input.url;
-  if(url.startsWith('/api/arena')||url.startsWith('/api/social')||url.startsWith('/api/messages')||url.startsWith('/api/friends'))await accountReady;
+  if(['/api/arena','/api/social','/api/messages','/api/friends','/api/organisations','/api/grounds','/api/bookings','/api/tournaments'].some(path=>url.startsWith(path)))await accountReady;
   if(url.startsWith('/api/'))options={...options,headers:{...options.headers,'X-Dhoyo-Request':'1'}};
   const result=await nativeFetch(input,options);
   if(result.status===401&&!url.startsWith('/api/auth/')&&!document.body.classList.contains('account-visible')){
-    account.userId=null;
+    setAccountIdentity({});
     showAccountForm('login','Your session has expired. Sign in again.');
   }
   return result;
 };
+function requireAccountSecureTransport(){
+  const local=['localhost','127.0.0.1','::1','[::1]'].includes(location.hostname);
+  if(location.protocol==='http:'&&!local)throw new Error('Open this site using HTTPS before signing in or changing your password.');
+}
 async function accountRequest(path,payload){
+  requireAccountSecureTransport();
+  const encrypted=payload?(path==='logout'?payload:await encryptAccountPayload(path,payload)):undefined;
   let response;
-  try{response=await nativeFetch('/api/auth/'+path,{method:payload?'POST':'GET',headers:{'Content-Type':'application/json','X-Dhoyo-Request':'1'},body:payload?JSON.stringify(payload):undefined});}
+  try{response=await nativeFetch('/api/auth/'+path,{method:payload?'POST':'GET',headers:{'Content-Type':'application/json','X-Dhoyo-Request':'1'},body:encrypted?JSON.stringify(encrypted):undefined});}
   catch{throw new Error('Could not reach the account service. Check your connection and try again.');}
   const value=await response.json().catch(()=>null);
   if(!response.ok)throw new Error(value?.error||'The account service is temporarily unavailable. Try again.');
@@ -56,7 +68,7 @@ function showAccountForm(mode='login',message='',notice=''){
   document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
   let overlay=document.getElementById('account-screen');
   const previousEmail=overlay?.querySelector('[name="email"]')?.value||accountRecoveryEmail;
-  if(!overlay){overlay=document.createElement('section');overlay.id='account-screen';overlay.setAttribute('aria-label','Player account access');document.body.append(overlay);}
+  if(!overlay){overlay=document.createElement('section');overlay.id='account-screen';overlay.setAttribute('aria-label','Account access');document.body.append(overlay);}
   document.querySelector('.shell').inert=true;document.querySelector('.sidebar').inert=true;document.querySelector('.app-bottom-nav').inert=true;
   document.body.classList.add('account-visible');
   overlay.classList.toggle('account-register',register);
@@ -86,7 +98,7 @@ function showAccountForm(mode='login',message='',notice=''){
         </div>
         <h2 id="account-title">${title}</h2>
         <p class="account-form-intro">${intro}</p>
-        ${register?'<label for="account-name">Your name<input id="account-name" name="name" autocomplete="name" placeholder="What should we call you?" maxlength="100" required></label>':''}
+        ${register?`<label for="account-type">Account type<select id="account-type" name="accountType"><option value="player" selected>Player — book grounds and join tournaments</option><option value="organisation">Organisation — manage grounds and tournaments</option></select></label><label for="account-organisation" class="account-organisation-field" hidden>Organisation name<input id="account-organisation" name="organisationName" autocomplete="organization" placeholder="Your organisation or club" maxlength="100" disabled></label><p class="account-role-note" hidden>Use your organisation’s email. Your name below identifies the administrator. Organisation accounts start unverified.</p><label for="account-name">Your name<input id="account-name" name="name" autocomplete="name" placeholder="What should we call you?" maxlength="100" required></label>`:''}
         ${reset?'':'<label for="account-email">Email address<input id="account-email" name="email" type="email" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="you@example.com" maxlength="254" required></label>'}
         ${code?'<label for="account-code">Verification code<input id="account-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" placeholder="6-digit code" required></label>':''}
         ${forgot?'':`<label for="account-password">${reset?'New password':'Password'}</label>
@@ -133,6 +145,17 @@ function showAccountForm(mode='login',message='',notice=''){
     if(button.dataset.accountMode!==mode)showAccountForm(button.dataset.accountMode);
   });
   const password=overlay.querySelector('[name="password"]');
+  const accountType=overlay.querySelector('[name="accountType"]');
+  if(accountType){
+    const updateAccountType=()=>{
+      const organisation=accountType.value==='organisation';
+      const field=overlay.querySelector('[name="organisationName"]');
+      field.disabled=!organisation;field.required=organisation;
+      overlay.querySelector('.account-organisation-field').hidden=!organisation;
+      overlay.querySelector('.account-role-note').hidden=!organisation;
+    };
+    accountType.onchange=updateAccountType;updateAccountType();
+  }
   const passwordToggle=overlay.querySelector('.account-password-toggle');
   if(passwordToggle)passwordToggle.onclick=event=>{
     const button=event.currentTarget,visible=password.type==='password';
@@ -152,12 +175,17 @@ function showAccountForm(mode='login',message='',notice=''){
     button.querySelector('span').textContent=register?'Creating your account…':forgot?'Sending verification code…':reset?'Resetting your password…':'Signing in…';
     const payload=Object.fromEntries(new FormData(form));
     if(payload.email)payload.email=payload.email.trim();
+    if(register){
+      payload.accountType=payload.accountType==='organisation'?'organisation':'player';
+      if(payload.accountType==='player')delete payload.organisationName;
+      else payload.organisationName=(payload.organisationName||'').trim();
+    }
     try{
       if(reset){
         if(payload.password!==payload.passwordConfirm)throw new Error('The new passwords do not match.');
         if(code&&!/^[0-9]{6}$/.test(payload.code||''))throw new Error('Enter the six-digit verification code from your email.');
         const result=await accountRequest(path,code?{challengeId:accountRecoveryChallenge,code:payload.code,password:payload.password}:{token:accountResetToken,password:payload.password});
-        accountResetToken='';accountRecoveryChallenge='';accountRecoveryReturnToProfile=false;account.userId=null;
+        accountResetToken='';accountRecoveryChallenge='';accountRecoveryReturnToProfile=false;setAccountIdentity({});
         showAccountForm('login','',result.message);
         return;
       }
@@ -167,15 +195,22 @@ function showAccountForm(mode='login',message='',notice=''){
         accountRecoveryChallenge=result.challengeId;accountRecoveryEmail=payload.email;
         showAccountForm('code','',result.message);return;
       }
-      account.userId=result.userId;
+      setAccountIdentity(result);
       await rememberAccountPassword(payload);
+      // The authenticated credential has been handed to the browser's password
+      // manager; do not leave a second copy in the outgoing form.
+      for(const name of ['password','passwordConfirm']){
+        const field=form.querySelector(`[name="${name}"]`);if(field)field.value='';
+      }
       form.remove();
-      location.replace('/ring#ring');
+      location.replace(account.accountType==='organisation'?'/ring#organisation':'/ring#ring');
     }
     catch(error){
       form.querySelector('.account-error').textContent=error.message;
     }
     finally{
+      // Secrets are needed only for this request and optional browser saving.
+      for(const name of ['password','passwordConfirm','code','token'])delete payload[name];
       button.disabled=false;modeButtons.forEach(item=>item.disabled=false);
       form.setAttribute('aria-busy','false');
       button.querySelector('span').textContent=submitLabel;
@@ -186,7 +221,8 @@ function showAccountForm(mode='login',message='',notice=''){
 (async()=>{
   if(accountResetToken){showAccountForm('reset');return;}
   if(accountRecoveryRequested){showAccountForm('forgot');return;}
-  try{const result=await accountRequest('me');account.userId=result.userId;if(!result.userId){showAccountForm();return;}
+  try{const result=await accountRequest('me');setAccountIdentity(result);if(!result.userId){showAccountForm();return;}
+    if(account.accountType==='organisation'&&(!location.hash||location.hash==='#ring'))history.replaceState(null,'',location.pathname+location.search+'#organisation');
     document.body.classList.remove('account-pending');
     document.querySelector('[data-bottom-route="profile"]').href='#player/'+encodeURIComponent(result.userId);
     const logout=document.createElement('button');logout.className='account-logout';logout.textContent='Sign out';logout.onclick=async()=>{try{await accountRequest('logout',{});location.reload();}catch(error){logout.textContent=error.message;}};document.querySelector('.topbar').append(logout);

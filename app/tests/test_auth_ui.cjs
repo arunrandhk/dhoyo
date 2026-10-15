@@ -107,8 +107,9 @@ function accountOverlay(events) {
   return overlay;
 }
 
-async function accountPage({register = false, authenticate, store, secure = true, credentialAPI = true, constructorError = false, credentialsAPI = true, hash = '', userId = null} = {}) {
+async function accountPage({register = false, authenticate, store, secure = true, credentialAPI = true, constructorError = false, credentialsAPI = true, hash = '', userId = null, protocol = 'https:', hostname = 'dhoyo.example'} = {}) {
   const events = [], requests = [], stored = [], navigations = [], historyChanges = [];
+  const encryptedFixtures = new Map();
   let overlay, formDataReads = 0;
   const context = {
     isSecureContext: secure,
@@ -124,6 +125,13 @@ async function accountPage({register = false, authenticate, store, secure = true
       body: {...element(), append() {}}
     },
     RingStickers: {ready: Promise.resolve([])},
+    // Form behavior tests isolate the encrypted transport. Real crypto and
+    // browser/server interoperability are covered separately.
+    encryptAccountPayload: async (_path, payload) => {
+      const ciphertext = 'fixture-' + encryptedFixtures.size;
+      encryptedFixtures.set(ciphertext, JSON.parse(JSON.stringify(payload)));
+      return {ciphertext};
+    },
     matchMedia: () => ({matches: false}),
     FormData: class {
       constructor(form) {
@@ -134,7 +142,8 @@ async function accountPage({register = false, authenticate, store, secure = true
     },
     fetch: async (url, options = {}) => {
       if (url === '/api/auth/me') return response({userId});
-      const request = {url, payload: options.body ? JSON.parse(options.body) : undefined};
+      const envelope = options.body ? JSON.parse(options.body) : undefined;
+      const request = {url, payload: envelope ? encryptedFixtures.get(envelope.ciphertext) : undefined};
       requests.push(request);
       events.push('authentication requested');
       const result = authenticate ? await authenticate(request) : response({userId: 'player-123'});
@@ -142,7 +151,7 @@ async function accountPage({register = false, authenticate, store, secure = true
       return result;
     },
     location: {
-      hash, pathname: '/ring', search: '', href: 'https://dhoyo.example/ring' + hash,
+      hash, protocol, hostname, pathname: '/ring', search: '', href: protocol + '//' + hostname + '/ring' + hash,
       replace(target) { navigations.push(target); events.push('navigate'); },
       reload() { assert.fail('Account access should perform one clear navigation after success'); }
     },
@@ -204,6 +213,28 @@ async function accountPage({register = false, authenticate, store, secure = true
   };
 }
 
+test('public HTTP login refuses to send credentials before any network request', async () => {
+  const page = await accountPage({protocol: 'http:', hostname: 'dhoyo.example', secure: false});
+  page.fill({email: 'player@example.com', password: 'long-password-123'});
+  await page.submit();
+  assert.match(page.form.error.textContent, /HTTPS/);
+  assert.deepEqual(page.requests, []);
+  assert.equal(page.stored.length, 0);
+  assert.deepEqual(page.navigations, []);
+});
+
+test('HTTP development on a loopback host remains available', async t => {
+  for (const hostname of ['localhost', '127.0.0.1', '[::1]']) {
+    await t.test(hostname, async () => {
+      const page = await accountPage({protocol: 'http:', hostname, secure: false});
+      page.fill({email: 'player@example.com', password: 'long-password-123'});
+      await page.submit();
+      assert.equal(page.requests[0].url, '/api/auth/login');
+      assert.deepEqual(page.navigations, ['/ring#ring']);
+    });
+  }
+});
+
 for (const register of [false, true]) {
   const mode = register ? 'registration' : 'login';
   test(`${mode} identifies its credential fields for browser password managers`, async () => {
@@ -226,6 +257,7 @@ for (const register of [false, true]) {
     assert.equal(page.form.submit.disabled, true);
     assert.equal(page.form.getAttribute('aria-busy'), 'true');
     assert.equal(page.formDataReads, 1);
+    await tick(); // Encryption completes before the authentication fetch starts.
     assert.equal(page.requests[0].url, '/api/auth/' + (register ? 'register' : 'login'));
     assert.equal(page.requests[0].payload.email, values.email.trim());
     assert.equal(page.requests[0].payload.password, values.password);
@@ -243,6 +275,7 @@ for (const register of [false, true]) {
     await submitted;
     assert.deepEqual(page.navigations, ['/ring#ring']);
     assert.equal(page.form.isConnected, false);
+    assert.equal(page.form.querySelector('[name="password"]').value, '', 'Clear the password from the outgoing form after browser saving');
     assert.deepEqual(page.events, ['authentication requested', 'authentication returned', 'password storage requested', 'password storage returned', 'form removed', 'navigate']);
     assert.equal(page.formDataReads, 1, 'Credential storage must reuse the authenticated submission');
   });

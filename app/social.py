@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from auth import current_user_id
 from privacy import can_view_photos, redact_photo_aliases, visible_photo_item
 
@@ -65,11 +65,11 @@ def raw_state():
 
 @contextmanager
 def state():
-    from auth import current_user_id
-    from flask import has_request_context, current_app
+    from auth import current_user_id, test_demo_enabled
+    from flask import has_request_context
     user_id = current_user_id()
     with raw_state() as data:
-        if not has_request_context() or current_app.config.get('AUTH_TEST_DEMO'):
+        if not has_request_context() or test_demo_enabled():
             yield data
             return
         original_preferences = data['preferences']
@@ -121,6 +121,8 @@ def active_stories(data):
 
 
 def body():
+    if request.path.startswith('/api/auth/') and hasattr(g, 'auth_payload'):
+        return g.auth_payload
     value = request.get_json(silent=True)
     return value if isinstance(value, dict) else {}
 

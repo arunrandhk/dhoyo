@@ -28,17 +28,19 @@ def clients(tmp_path, monkeypatch):
 def register(client, email='alex@example.com'):
     response = client.post('/api/auth/register', json=dict(
         name='Alex', email=email, password=PASSWORD, sport='Football',
-        city='Delhi', state='Delhi', country='India'), headers=HEADERS)
+        city='Delhi', state='Delhi', country='India'), headers=HEADERS, base_url='https://localhost')
     assert response.status_code == 201
     return response.json['userId']
 
 
 def login(client, password=PASSWORD, email='alex@example.com', **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/login', json={'email': email, 'password': password},
                        headers=HEADERS, **kwargs)
 
 
 def change(client, current_password=PASSWORD, password=NEW_PASSWORD, **kwargs):
+    kwargs.setdefault('base_url', 'https://localhost')
     return client.post('/api/auth/change-password', json={
         'currentPassword': current_password, 'password': password}, headers=HEADERS, **kwargs)
 
@@ -71,6 +73,7 @@ def test_change_rotates_session_revokes_account_credentials_and_preserves_other_
     assert response.status_code == 200
     assert response.json == {
         'userId': player_id,
+        'name': 'Alex', 'accountType': 'player', 'organisationId': None,
         'message': 'Your password has been updated. Other sessions have been signed out.',
     }
     new_cookie = owner.get_cookie(COOKIE)
