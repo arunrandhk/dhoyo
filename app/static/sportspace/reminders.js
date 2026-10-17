@@ -1,6 +1,6 @@
 // Private reminders use the signed-in server account, never browser demo data.
 const remindersPreviousRender=render,remindersPreviousNavigate=navigate;
-const remindersState={request:0,loading:false,saving:false,error:'',data:null,draft:null,timer:null,owner:null};
+const remindersState={request:0,loading:false,saving:false,error:'',data:null,draft:null,timer:null,owner:null,whatsappCodeSent:false};
 const remindersActive=()=>view==='reminders';
 const remindersVisible=()=>remindersActive()&&document.visibilityState!=='hidden';
 function remindersStop(){clearTimeout(remindersState.timer);remindersState.timer=null;}
@@ -65,8 +65,9 @@ function remindersForm(){
   return `<form id="reminders-preferences" class="reminders-preferences"><div><h2>Your reminder preferences</h2><p>Start times and registration deadlines for tournaments you’ve joined.</p></div>
     <label class="reminders-toggle"><input type="checkbox" name="inApp" ${prefs.inApp?'checked':''}>Show in-app reminders</label>
     <label class="reminders-toggle"><input type="checkbox" name="email" ${prefs.email?'checked':''}>Email me tournament reminders</label>
+    ${remindersState.data.phoneVerified?`<label class="reminders-toggle"><input type="checkbox" name="whatsapp" ${prefs.whatsapp?'checked':''}>WhatsApp me tournament reminders</label>${remindersState.data.whatsappDeliveryConfigured?'':'<p class="reminders-note">WhatsApp sending is not configured yet. You can turn this preference off here.</p>'}`:remindersState.data.whatsappDeliveryConfigured&&remindersState.data.phonePresent?`<div class="reminders-whatsapp-verify"><p>Verify your account phone to enable WhatsApp reminders. By requesting a code, you agree to receive tournament reminder messages in WhatsApp.</p>${remindersState.whatsappCodeSent?'<label class="reminders-code-label">Six-digit verification code<input name="whatsappCode" type="text" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="one-time-code"></label><button type="button" class="org-button" data-whatsapp-verify>Verify &amp; enable WhatsApp</button>':'<button type="button" class="org-button" data-whatsapp-send>Verify phone &amp; enable WhatsApp</button>'}</div>`:`<p class="reminders-note">WhatsApp reminders are not ready. Configure the WhatsApp Business sender and add a phone number to your account.</p>`}
     <fieldset><legend>Remind me before each deadline</legend><div class="reminders-leads">${[[48,'2 days'],[24,'1 day'],[6,'6 hours'],[1,'1 hour']].map(([hours,label])=>`<label><input type="checkbox" name="leadHours" value="${hours}" ${prefs.leadHours.includes(hours)?'checked':''}>${label}</label>`).join('')}</div></fieldset>
-    <p class="reminders-note">Times below use your device’s timezone. This page refreshes every minute while visible. Email is optional and goes to your verified account address.</p>
+    <p class="reminders-note">Times below use your device’s timezone. Email reminders start enabled for new accounts and can be turned off here. They go only to your verified account address. WhatsApp requires a verified phone and explicit opt-in.</p>
     ${remindersState.data.emailDeliveryConfigured?'':'<p class="reminders-note">Email delivery is not configured yet. You can save your preference for when it is available.</p>'}
     <div class="reminders-actions"><button class="primary" type="submit" ${remindersState.saving?'disabled':''}>${remindersState.saving?'Saving…':'Save preferences'}</button><span role="status" id="reminders-save-status"></span></div>
   </form>`;
@@ -118,6 +119,7 @@ async function remindersLoad(background=false){
 }
 function remindersDraft(form){
   return {inApp:form.elements.inApp.checked,email:form.elements.email.checked,
+    ...(form.elements.whatsapp?{whatsapp:form.elements.whatsapp.checked}:{}),
     leadHours:[...form.querySelectorAll('[name="leadHours"]:checked')].map(input=>Number(input.value))};
 }
 async function remindersSave(payload,path=''){
@@ -162,9 +164,31 @@ document.addEventListener('click',event=>{
   if(!remindersActive())return;
   const button=event.target.closest('button');if(!button)return;
   if('remindersRefresh' in button.dataset)remindersLoad();
+  else if('whatsappSend' in button.dataset)remindersWhatsAppSend();
+  else if('whatsappVerify' in button.dataset)remindersWhatsAppVerify();
   else if(button.dataset.reminderRead)remindersSave({read:button.dataset.reminderReadValue==='true'},'/'+encodeURIComponent(button.dataset.reminderRead));
   else if(button.dataset.reminderDismiss)remindersSave({dismissed:true},'/'+encodeURIComponent(button.dataset.reminderDismiss));
 });
+async function remindersWhatsAppSend(){
+  if(remindersState.saving||!remindersState.data?.whatsappDeliveryConfigured)return;
+  remindersState.saving=true;render();
+  try{await remindersRequest('/whatsapp-verification','POST',{action:'send'},remindersState.owner);remindersState.whatsappCodeSent=true;toast('WhatsApp verification code sent.');}
+  catch(error){remindersState.error=error.message;}
+  finally{remindersState.saving=false;if(remindersActive())render();}
+}
+async function remindersWhatsAppVerify(){
+  if(remindersState.saving)return;
+  const code=document.querySelector('[name="whatsappCode"]')?.value||'';
+  if(!/^[0-9]{6}$/.test(code)){remindersState.error='Enter the six-digit code sent to WhatsApp.';render();return;}
+  remindersState.saving=true;render();
+  try{
+    const result=await remindersRequest('/whatsapp-verification','POST',{action:'verify',code},remindersState.owner);
+    remindersState.whatsappCodeSent=false;
+    if(remindersState.data){remindersState.data.phoneVerified=true;remindersState.data.preferences=result.preferences;}
+    toast(result.message||'WhatsApp reminders enabled.');
+  }catch(error){remindersState.error=error.message;}
+  finally{remindersState.saving=false;if(remindersActive())render();}
+}
 document.addEventListener('change',event=>{
   const form=event.target.closest('#reminders-preferences');
   if(form)remindersState.draft=remindersDraft(form);

@@ -1,5 +1,6 @@
 // Player-first profiles and explicit geographic feed scopes.
 const playerHub={profiles:new Map(),loading:new Set(),errors:new Map(),revision:0};
+const hubAccountOverview={owner:null,request:0,loading:false,error:'',data:null};
 const hubBaseRender=render,hubBaseAPI=arenaAPI,hubBaseSocialAPI=api;
 const hubPlayerURL=(id,tab='moments')=>'#player/'+encodeURIComponent(id)+'/'+tab;
 const hubLocation=p=>[p.city,p.state,p.country].filter(Boolean).join(' / ');
@@ -150,6 +151,58 @@ function hubProfileStories(p,data){
   return `<section class="hub-stories"><div class="hub-section-heading"><div><span class="eyebrow">PLAYER STORIES / 24 HOURS</span><h2>${p.id===arena.data.currentUserId?'Your':escape(p.name.split(' ')[0])+"’s"} stories</h2></div>${p.id===arena.data.currentUserId?'<button type="button" data-add-story>+ Add story</button>':''}</div><div class="hub-story-list">${active.map(s=>`<button type="button" class="hub-story" data-hub-story="${escape(s.id)}" data-hub-player="${escape(p.id)}"><img src="${escape(s.image)}" alt="${escape(s.text||s.sport)}" loading="lazy"><strong>${escape(s.sport)}</strong><small>Added by ${escape(p.name)}</small></button>`).join('')||hubEmpty('No active stories. New stories appear here for 24 hours.')}</div></section>`;
 }
 
+function hubOverviewLoad(id){
+  if(hubAccountOverview.owner!==id){
+    ++hubAccountOverview.request;hubAccountOverview.owner=id;hubAccountOverview.loading=false;
+    hubAccountOverview.error='';hubAccountOverview.data=null;
+  }
+  if(hubAccountOverview.loading||hubAccountOverview.data||hubAccountOverview.error)return;
+  const request=++hubAccountOverview.request;
+  hubAccountOverview.loading=true;
+  Promise.all([
+    '/api/progression/me','/api/progression/leaderboard?sport=All%20sports',
+    '/api/reminders','/api/play-games/config','/api/play-games/status'
+  ].map(async path=>{
+    const response=await fetch(path,{cache:'no-store',headers:{'Content-Type':'application/json'}});
+    const value=await response.json().catch(()=>null);
+    if(!response.ok)throw new Error(value?.error||'Your account overview could not be loaded.');
+    return value;
+  })).then(([progress,ranking,reminders,playConfig,playStatus])=>{
+    if(request!==hubAccountOverview.request||id!==account.userId)return;
+    if(progress.playerId!==id||ranking.currentUserId!==id||reminders.currentUserId!==id||playStatus.currentUserId!==id)
+      throw new Error('Your signed-in account changed. Refresh your profile.');
+    hubAccountOverview.data={progress,ranking,reminders,playConfig,playStatus};
+  }).catch(error=>{
+    if(request===hubAccountOverview.request&&id===account.userId)hubAccountOverview.error=error.message||'Your account overview could not be loaded.';
+  }).finally(()=>{
+    if(request===hubAccountOverview.request&&id===account.userId){
+      hubAccountOverview.loading=false;
+      if(view==='player'&&decodeURIComponent(arena.route.split('/')[1]||'')===id)render();
+    }
+  });
+}
+
+function hubProfileAccountOverview(id){
+  hubOverviewLoad(id);
+  const data=hubAccountOverview.data;
+  if(hubAccountOverview.loading)return '<section class="hub-account-overview"><p role="status">Loading your tournaments, achievements and reminders…</p></section>';
+  if(hubAccountOverview.error)return `<section class="hub-account-overview"><p role="alert">${escape(hubAccountOverview.error)}</p><button type="button" class="hub-link" data-hub-overview-refresh>Retry profile overview</button></section>`;
+  if(!data)return '';
+  const {progress,ranking,reminders,playConfig,playStatus}=data;
+  const earned=progress.achievements.filter(item=>item.unlocked);
+  const rank=ranking.myRank?`#${ranking.myRank}`:'Unranked this season';
+  const badges=progress.achievements.map(item=>{
+    const count=Math.max(0,Number(item.progress)||0),target=Math.max(1,Number(item.target)||1),percent=Math.round(Math.min(count,target)/target*100);
+    return `<article class="progress-badge ${item.unlocked?'is-earned':''}"><span class="progress-badge-mark" aria-hidden="true">${icon(item.unlocked?'medal':'star')}</span><div><span class="progress-kicker">${item.unlocked?'UNLOCKED':'NEXT MILESTONE'}</span><h3>${escape(item.name)}</h3><p>${escape(item.description)}</p><div class="progress-meter" role="progressbar" aria-label="${escape(item.name)}" aria-valuenow="${Math.min(count,target)}" aria-valuemin="0" aria-valuemax="${target}"><span style="width:${percent}%"></span></div><small>${item.unlocked?`Earned ${escape(progressDate(item.earnedAt))}`:`${count} / ${target}`}</small></div></article>`;
+  }).join('');
+  const reminderCards=reminders.preferences.inApp?reminders.reminders.map(item=>`<article class="reminders-card ${item.read?'is-read':'is-unread'}"><div class="reminders-card-heading"><span class="reminders-label">${escape(item.title)}</span>${item.read?'':'<span class="reminders-unread">Unread</span>'}</div><h3>${escape(item.tournamentName)}</h3><p>${escape(item.organisationName||'')}${item.organisationName?' · ':''}${escape(item.sport||'')}</p><p class="reminders-date"><time datetime="${escape(item.targetAt)}">${escape(new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(item.targetAt)))}</time><strong>${escape(remindersRelative(item.targetAt))}</strong></p>${item.kind==='registration_closes'?'<p class="reminders-note">Your team is registered. Check any changes before registration closes.</p>':''}</article>`).join(''):'<p class="hub-empty">In-app reminders are paused. You can change this in reminder settings.</p>';
+  return `<div id="profile-tournament-details" class="hub-account-overview" aria-label="Your tournaments, achievements and reminders"><div class="hub-overview-heading"><div><span class="eyebrow">YOUR TOURNAMENTS</span><h2>Achievements &amp; reminders</h2><p>Your tournament milestones and upcoming team dates, together in your profile.</p></div><a href="#tournaments">Find tournaments ↗</a></div>
+    <div class="hub-overview-stats"><div><strong>${progress.stats.registeredTournaments}</strong><span>Tournaments joined</span></div><div><strong>${progress.stats.completedTournaments}</strong><span>Tournaments completed</span></div><div><strong>${earned.length} / ${progress.achievements.length}</strong><span>Achievements earned</span></div><div><strong>${escape(rank)}</strong><span>Dhoyo season rank</span></div></div>
+    <section class="hub-profile-tournament-section"><div class="hub-section-heading"><div><h2>Tournament achievements</h2><p>Earned through your confirmed team registrations and completed tournaments.</p></div><a href="#progress">Full seasonal rankings ↗</a></div><div class="progress-badges">${badges||hubEmpty('Your first tournament registration starts your achievement progress.')}</div></section>
+    <section class="hub-profile-tournament-section"><div class="hub-section-heading"><div><h2>Upcoming tournament reminders</h2><p>Start times and registration deadlines for tournaments you’ve joined.</p></div><a href="#reminders">Reminder settings ↗</a></div><div class="reminders-list">${reminderCards||'<p class="hub-empty">No upcoming reminders. Join a tournament to see dates here.</p>'}</div></section>
+    <p class="hub-overview-note">Google Play Games: ${playStatus.linked?'Connected to Dhoyo':playConfig.playGamesEnabled?'Ready to connect from Dhoyo for Android':'Setup pending; your Dhoyo achievements remain available here'}${playStatus.lastSyncedAt?` · Last sync ${escape(new Date(playStatus.lastSyncedAt).toLocaleString())}`:''}</p></div>`;
+}
+
 playerPage=function(){
   const id=decodeURIComponent(arena.route.split('/')[1]||''),p=arenaPlayer(id);
   if(!p){
@@ -157,10 +210,10 @@ playerPage=function(){
     return error?`<div class="arena-error" role="alert">${escape(error)} <button type="button" data-hub-retry="${escape(id)}">Retry profile</button></div>`:'<p role="status" class="hub-empty">Loading this player’s profile…</p>';
   }
   const data=playerHub.profiles.get(id),error=playerHub.errors.get(id);
-  const requested=arena.route.split('/')[2],tab=['matches','awards','photos'].includes(requested)?requested:'moments';
-  const own=id===arena.data.currentUserId,teamCount=arena.data.teams.filter(t=>t.members.includes(id)).length;
+  const requested=arena.route.split('/')[2],own=id===arena.data.currentUserId,showPlayerOverview=own&&account.accountType!=='organisation',tab=['matches','awards','photos'].includes(requested)?requested:'moments';
+  const teamCount=arena.data.teams.filter(t=>t.members.includes(id)).length;
   const photosHidden=p.canViewPhotos===false,fullPhoto=photosHidden?'':p.cover||p.avatar||p.image;
-  const header=`<section class="hub-profile"><div class="hub-identity">${arenaAvatar(p)}<div><span class="eyebrow">PLAYER PROFILE</span>${p.photoPrivacy==='friends'?'<span class="hub-photo-audience">Photos: friends only</span>':''}<h2>${escape(p.name)}</h2><p>${escape(p.sport)} · ${escape(hubLocation(p))}</p>${p.bio?`<p class="hub-bio">${escape(p.bio)}</p>`:''}</div><div class="hub-profile-actions">${own?'<button type="button" class="primary" data-edit-profile>Edit profile</button><a class="hub-tournament-link" href="#progress">Tournament achievements & rankings ↗</a><a class="hub-tournament-link" href="#reminders">Tournament reminders ↗</a><button type="button" data-hub-upload>Upload full photo</button>':`${supportButton(p)}<button type="button" data-follow="${escape(p.name)}">${social.preferences.following.includes(p.name)?'Following':'Follow player'}</button>`}<button type="button" data-hub-share="${escape(id)}">Copy profile link ↗</button></div></div><div class="hub-stats"><a href="${hubPlayerURL(id,'matches')}"><strong>${p.gamesPlayed}</strong><span>Games played ↗</span></a><a href="${hubPlayerURL(id,'matches')}"><strong>${p.wins}</strong><span>Wins / ${p.gamesPlayed?Math.round(p.wins/p.gamesPlayed*100):0}% rate ↗</span></a><a href="${hubPlayerURL(id,'awards')}">${rankBadge(p.rank)||'<strong>Unranked</strong>'}<span>Rank details ↗</span></a><a href="${hubPlayerURL(id,'connections')}"><strong>${data?.connections.length??'…'}</strong><span>Player connections ↗</span></a></div></section>`;
+  const header=`<section class="hub-profile"><div class="hub-identity">${arenaAvatar(p)}<div><span class="eyebrow">PLAYER PROFILE</span>${p.photoPrivacy==='friends'?'<span class="hub-photo-audience">Photos: friends only</span>':''}<h2>${escape(p.name)}</h2><p>${escape(p.sport)} · ${escape(hubLocation(p))}</p>${p.bio?`<p class="hub-bio">${escape(p.bio)}</p>`:''}</div><div class="hub-profile-actions">${own?'<button type="button" class="primary" data-edit-profile>Edit profile</button>':`${supportButton(p)}<button type="button" data-follow="${escape(p.name)}">${social.preferences.following.includes(p.name)?'Following':'Follow player'}</button>`}${own?'<button type="button" data-hub-upload>Upload full photo</button>':''}<button type="button" data-hub-share="${escape(id)}">Copy profile link ↗</button></div></div><div class="hub-stats"><a href="${hubPlayerURL(id,'matches')}"><strong>${p.gamesPlayed}</strong><span>Games played ↗</span></a><a href="${hubPlayerURL(id,'matches')}"><strong>${p.wins}</strong><span>Wins / ${p.gamesPlayed?Math.round(p.wins/p.gamesPlayed*100):0}% rate ↗</span></a><a href="${hubPlayerURL(id,'awards')}">${rankBadge(p.rank)||'<strong>Unranked</strong>'}<span>Rank details ↗</span></a><a href="${hubPlayerURL(id,'connections')}"><strong>${data?.connections.length??'…'}</strong><span>Player connections ↗</span></a></div>${showPlayerOverview?hubProfileAccountOverview(id):''}</section>`;
   const tabs=`<nav class="hub-tabs" aria-label="Profile sections">${[['moments','Moments'],['matches','Matches'],['awards','Rank & awards'],['photos','Photos']].map(([key,label])=>`<a href="${hubPlayerURL(id,key)}" class="${tab===key?'active':''}" ${tab===key?'aria-current="page"':''}>${label}</a>`).join('')}</nav>`;
   const connections=hubProfileConnections(p,data);
   const fullPhotoHTML=photosHidden?hubPrivatePhotos():`<div class="hub-cover">${fullPhoto?`<button type="button" data-hub-photo="${escape(id)}" aria-label="Open full photo of ${escape(p.name)}"><img src="${escape(fullPhoto)}" alt="${escape(p.name)}'s ${p.cover||p.avatar?'profile photo':'sporting moment'}"></button>`:'<div class="hub-no-photo">YOUR GAME. YOUR STORY.</div>'}<span class="hub-cover-label">${escape(p.state||p.city)} / ${escape(p.country)}</span></div>`;
@@ -219,6 +272,7 @@ async function detectProfileLocation(button){
 document.addEventListener('click',async event=>{
   const button=event.target.closest('button');if(!button)return;const d=button.dataset;
   if('profileDetectLocation'in d)await detectProfileLocation(button);
+  else if('hubOverviewRefresh'in d){hubAccountOverview.data=null;hubAccountOverview.error='';hubAccountOverview.loading=false;hubOverviewLoad(account.userId);render();}
   else if(d.hubStory){
     const data=playerHub.profiles.get(d.hubPlayer);if(!data||arenaPlayer(d.hubPlayer)?.canViewPhotos===false)return;
     const known=new Set(social.stories.map(s=>s.id));social.stories.push(...data.stories.filter(s=>!known.has(s.id)));

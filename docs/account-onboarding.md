@@ -4,8 +4,9 @@ New password and Google accounts complete the same required profile: name,
 international phone number, sport, city, state and country. An organisation
 account also supplies its organisation name. Formatted phone numbers such as
 `+91 98765 43210` are normalized to `+919876543210`. The phone number is collected
-privately on the account; there is no SMS verification and `phone_verified`
-remains false. Public player profiles do not expose phone or email.
+privately on the account and starts unverified. Players can verify it through
+WhatsApp when WhatsApp reminders are configured. Public player profiles do not
+expose phone or email.
 
 New accounts cannot sign in or access authenticated APIs until they open the
 activation email. Existing accounts without an `email_verified` field remain

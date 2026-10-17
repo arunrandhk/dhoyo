@@ -125,6 +125,15 @@ def settings():
                 achievements=achievements, leaderboard_id=leaderboard)
 
 
+def configuration_issues():
+    required = ('PLAY_GAMES_APPLICATION_ID', 'PLAY_GAMES_WEB_CLIENT_ID',
+                'PLAY_GAMES_WEB_CLIENT_SECRET')
+    missing = [name for name in required if not setting(name)]
+    if missing:
+        return missing
+    return [] if settings() is not None else ['Check the format of the configured Play Games settings']
+
+
 def private(response):
     response.headers['Cache-Control'] = 'no-store'
     return response
@@ -178,6 +187,7 @@ def config():
     configured = settings()
     return private(jsonify(storeUrl=store_url(), androidPackage=android_package(),
         playGamesEnabled=configured is not None,
+        setupIssues=[] if configured else configuration_issues(),
         applicationId=configured['application_id'] if configured else None,
         leaderboardId=configured['leaderboard_id'] if configured else None))
 

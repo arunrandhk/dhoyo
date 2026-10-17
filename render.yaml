@@ -42,9 +42,110 @@ services:
         sync: false # Sender address on your verified Resend domain.
       - key: PASSWORD_RESET_BASE_URL
         sync: false # Public HTTPS app URL, for example https://your-domain/ring.
+      # Optional alternatives; if using Gmail, configure all three credentials.
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      # Optional SMTP sender; SMTP_USERNAME and SMTP_PASSWORD must be paired.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_USERNAME
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      # Optional Meta WhatsApp Cloud API. Templates must be approved by Meta.
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TEMPLATE
+        sync: false
+      - key: WHATSAPP_REMINDER_TEMPLATE
+        sync: false
+      - key: WHATSAPP_GRAPH_API_VERSION
+        value: v25.0
+      - key: WHATSAPP_TEMPLATE_LANGUAGE
+        value: en_US
       - key: GOOGLE_CLIENT_ID
         value: "" # Optional Google web OAuth client ID; blank keeps Google sign-in disabled.
       # Optional Android/Play Games integration: docs/google-play-setup.md.
       # Add PLAY_GAMES_WEB_CLIENT_SECRET privately after creating a game-server credential.
       - key: ANDROID_PACKAGE_NAME
         value: com.dhoyo.app
+      # PGS must be created and linked in Play Console before these are set.
+      - key: PLAY_GAMES_APPLICATION_ID
+        sync: false
+      - key: PLAY_GAMES_WEB_CLIENT_ID
+        sync: false
+      - key: PLAY_GAMES_WEB_CLIENT_SECRET
+        sync: false
+      - key: PLAY_GAMES_LEADERBOARD_ID
+        sync: false
+      - key: PLAY_GAMES_ACHIEVEMENTS_JSON
+        value: "{}"
+      - key: PLAY_STORE_URL
+        sync: false
+  - type: cron
+    name: dhoyo-tournament-reminders
+    runtime: docker
+    region: singapore
+    schedule: "*/5 * * * *"
+    dockerfilePath: ./app/Dockerfile
+    dockerContext: ./app
+    dockerCommand: flask --app app reminders send-due --limit 100
+    envVars:
+      - key: DB_HOST
+        fromService: {type: web, name: byte-ring-demo, envVarKey: DB_HOST}
+      - key: DB_NAME
+        fromService: {type: web, name: byte-ring-demo, envVarKey: DB_NAME}
+      - key: DB_USER
+        fromService: {type: web, name: byte-ring-demo, envVarKey: DB_USER}
+      - key: DB_PASSWORD
+        fromService: {type: web, name: byte-ring-demo, envVarKey: DB_PASSWORD}
+      - key: DB_PORT
+        value: "5432"
+      - key: PGSSLMODE
+        value: require
+      - key: RESEND_API_KEY
+        fromService: {type: web, name: byte-ring-demo, envVarKey: RESEND_API_KEY}
+      - key: PASSWORD_RESET_FROM
+        fromService: {type: web, name: byte-ring-demo, envVarKey: PASSWORD_RESET_FROM}
+      - key: GMAIL_CLIENT_ID
+        fromService: {type: web, name: byte-ring-demo, envVarKey: GMAIL_CLIENT_ID}
+      - key: GMAIL_CLIENT_SECRET
+        fromService: {type: web, name: byte-ring-demo, envVarKey: GMAIL_CLIENT_SECRET}
+      - key: GMAIL_REFRESH_TOKEN
+        fromService: {type: web, name: byte-ring-demo, envVarKey: GMAIL_REFRESH_TOKEN}
+      - key: SMTP_HOST
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_HOST}
+      - key: SMTP_PORT
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_PORT}
+      - key: SMTP_FROM
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_FROM}
+      - key: SMTP_USERNAME
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_USERNAME}
+      - key: SMTP_PASSWORD
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_PASSWORD}
+      - key: SMTP_USE_TLS
+        fromService: {type: web, name: byte-ring-demo, envVarKey: SMTP_USE_TLS}
+      - key: WHATSAPP_ACCESS_TOKEN
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_ACCESS_TOKEN}
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_PHONE_NUMBER_ID}
+      - key: WHATSAPP_VERIFY_TEMPLATE
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_VERIFY_TEMPLATE}
+      - key: WHATSAPP_REMINDER_TEMPLATE
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_REMINDER_TEMPLATE}
+      - key: WHATSAPP_GRAPH_API_VERSION
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_GRAPH_API_VERSION}
+      - key: WHATSAPP_TEMPLATE_LANGUAGE
+        fromService: {type: web, name: byte-ring-demo, envVarKey: WHATSAPP_TEMPLATE_LANGUAGE}
