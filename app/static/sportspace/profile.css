@@ -17,6 +17,7 @@
 .profile-preview-note{font-size:11px;line-height:1.7;color:#a5b396;margin-top:26px;padding-top:18px;border-top:1px solid #465339}
 .profile-fields{min-width:0;padding-top:2px}
 .profile-section-heading{display:flex;gap:12px;align-items:flex-start;margin-bottom:27px}
+.profile-photo-privacy{padding:17px;border:1px solid #46503d;border-radius:8px;margin-bottom:25px;background:#1a2016}
 .profile-section-heading>span{font-size:11px;color:#d4fa62;border:1px solid #4e603b;border-radius:5px;padding:7px}
 .profile-section-heading h3{margin:0 0 5px;font-size:17px;font-weight:650}
 .profile-section-heading p{margin:0;font-size:12px;color:#98a58b;line-height:1.5}

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+    </queries>
+    <application
+        android:name=".DhoyoApplication"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:icon="@drawable/ic_dhoyo"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Dhoyo"
+        android:usesCleartextTraffic="false">
+        <meta-data android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/play_games_application_id" />
+        <meta-data android:name="com.google.android.gms.version"
+            android:value="@integer/google_play_services_version" />
+        <meta-data android:name="com.google.android.gms.games.SUPPRESS_GAME_PROFILE_CREATION"
+            android:value="true" />
+        <!-- The SDK's unconditional provider would run before our configuration
+             guard. Explicit Application initialization handles configured builds. -->
+        <provider android:name="com.google.android.gms.games.provider.PlayGamesInitProvider"
+            tools:node="remove" />
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dhoyo" android:host="play-games" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

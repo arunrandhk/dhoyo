@@ -4,42 +4,77 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>dhoyo | Your people. Your game.</title>
+  <meta name="description" content="Find your sporting community, share your highlights, and make room for your next game. Welcome to dhoyo.">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="social.css">
   <link rel="stylesheet" href="arena.css">
   <link rel="stylesheet" href="ring.css">
   <link rel="stylesheet" href="network.css">
+  <link rel="stylesheet" href="connections.css">
   <link rel="stylesheet" href="profile.css">
+  <link rel="stylesheet" href="player-hub.css">
+  <link rel="stylesheet" href="game.css">
+  <link rel="stylesheet" href="auth.css">
+  <link rel="stylesheet" href="messages.css">
+  <link rel="stylesheet" href="stickers.css">
+  <link rel="stylesheet" href="friends.css">
+  <link rel="stylesheet" href="organisations.css">
+  <link rel="stylesheet" href="progression.css">
+  <link rel="stylesheet" href="reminders.css">
+  <link rel="stylesheet" href="google-play.css">
+  <script src="stickers.js" defer></script>
+  <script src="account-onboarding.js" defer></script>
+  <script src="auth-ui.js" defer></script>
+  <script src="auth-encryption.js" defer></script>
   <script src="app.js" defer></script>
   <script src="social.js" defer></script>
   <script src="arena.js" defer></script>
   <script src="ring.js" defer></script>
   <script src="network.js" defer></script>
+  <script src="connections.js" defer></script>
+  <script src="player-hub.js" defer></script>
+  <script src="messages.js" defer></script>
+  <script src="stickers-ui.js" defer></script>
+  <script src="friends.js" defer></script>
+  <script src="account-security.js" defer></script>
+  <script src="organisations.js" defer></script>
+  <script src="progression.js" defer></script>
+  <script src="reminders.js" defer></script>
+  <script src="google-play.js" defer></script>
 </head>
-<body>
+<body class="account-pending">
   <aside class="sidebar">
-    <a class="brand" href="#ring"><span class="brand-mark">D</span> dhoyo<span class="ring-wordmark-dot">.</span></a>
+    <a class="brand" href="#ring" aria-label="dhoyo home"><span class="brand-mark" aria-hidden="true">D</span> dhoyo<span class="ring-wordmark-dot">.</span></a>
     <div class="workspace-label">YOUR SPORTING UNIVERSE</div>
     <nav aria-label="Main navigation">
-      <button data-ring-route="ring"><img class="nav-icon" src="icons/house.svg" alt=""> Your dhoyo</button>
+      <button data-org-route="organisation" hidden><img class="nav-icon" src="icons/trophy.svg" alt=""> Organisation dashboard</button>
+      <button data-ring-route="ring"><img class="nav-icon" src="icons/house.svg" alt=""> Social feed</button>
+      <button data-ring-route="connections"><img class="nav-icon" src="icons/users.svg" alt=""> Connections</button>
       <button data-ring-route="discover"><img class="nav-icon" src="icons/compass.svg" alt=""> Discover Arenas</button>
-      <button data-ring-route="player/demo-user"><img class="nav-icon" src="icons/user.svg" alt=""> My profile</button>
       <button data-view="grounds"><img class="nav-icon" src="icons/map-pin.svg" alt=""> Book a ground</button>
       <button data-view="tournaments"><img class="nav-icon" src="icons/trophy.svg" alt=""> Tournaments</button>
+      <button data-play-route="google-play"><img class="nav-icon" src="icons/trophy.svg" alt=""> Google Play</button>
       <button data-view="activity"><img class="nav-icon" src="icons/bookmark.svg" alt=""> Saved & activity</button>
     </nav>
     <div id="ring-memberships"></div>
-    <div class="sidebar-bottom"><span class="avatar mine">JD</span><div><strong>Jordan Davis</strong><small>Player account · Demo</small></div></div>
+    <div class="sidebar-bottom"><span class="avatar mine">JD</span><div><strong>Jordan Davis</strong><small>Player account</small></div></div>
   </aside>
   <div class="shell">
-    <header class="topbar"><span class="top-title">THE NEXT GENERATION OF PLAY</span><label class="search"><img class="nav-icon" src="icons/search.svg" alt=""><input id="search" type="search" placeholder="Search your dhoyo" aria-label="Search current view"></label><a href="#player/demo-user" class="avatar mine small" aria-label="My player profile">JD</a></header>
+    <header class="topbar"><span class="top-title">THE NEXT GENERATION OF PLAY</span><label class="search"><img class="nav-icon" src="icons/search.svg" alt=""><input id="search" type="search" placeholder="Search players, sports and places" aria-label="Search players, sports and places"></label></header>
     <main>
       <div class="page-heading"><div><p class="eyebrow" id="eyebrow">THE COMMUNITY</p><h1 id="title">A shared love of the game.</h1><p id="subtitle">On the field. On the server. In good company.</p></div><button class="primary" id="create">+ Create post</button></div>
       <div class="filters" id="filters" role="group" aria-label="Filter by sport"></div>
       <div id="content"></div>
     </main>
-    <footer>dhoyo / MADE FOR THE GAME <span id="connection-status">Demo account</span></footer>
+    <footer>dhoyo / MADE FOR THE GAME <span id="connection-status">Connecting to your account…</span></footer>
   </div>
+  <nav class="app-bottom-nav" aria-label="App navigation">
+    <a href="#ring" data-bottom-route="ring"><img src="icons/house.svg" alt=""><span>Home</span></a>
+    <a href="#connections" data-bottom-route="connections"><img src="icons/users.svg" alt=""><span>Connections</span></a>
+    <button type="button" data-compose aria-label="Share a moment"><img src="icons/plus.svg" alt=""><span>Share</span></button>
+    <a href="#activity" data-bottom-route="activity"><img src="icons/bookmark.svg" alt=""><span>Saved</span></a>
+    <a href="#player/demo-user" data-bottom-route="profile"><span class="bottom-profile-avatar">JD</span><span>Profile</span></a>
+  </nav>
   <dialog id="modal"><form id="modal-form"><div class="modal-heading"><h2 id="modal-title"></h2><button type="button" class="icon-button" id="close-modal" aria-label="Close dialog" title="Close">×</button></div><div id="modal-body"></div><button class="primary wide" id="submit-modal" type="submit">Save</button></form></dialog>
   <div id="toast" role="status"></div>
   <dialog id="story-dialog" aria-label="Story viewer"><div id="story-content"></div></dialog>

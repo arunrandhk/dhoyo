@@ -8,7 +8,9 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
+from auth import current_user_id
+from privacy import can_view_photos, redact_photo_aliases, visible_photo_item
 
 social = Blueprint('social', __name__, url_prefix='/api/social')
 SPORTS = {'Football', 'Cricket', 'Basketball', 'Badminton', 'Tennis', 'Running', 'Esports', 'Swimming', 'Volleyball'}
@@ -41,7 +43,7 @@ def seed():
 
 
 @contextmanager
-def state():
+def raw_state():
     if not os.environ.get("SPORTSPACE_SOCIAL_DB"):
         from db import sportspace_state
         with sportspace_state(seed) as data:
@@ -61,6 +63,37 @@ def state():
         connection.close()
 
 
+@contextmanager
+def state():
+    from auth import current_user_id, test_demo_enabled
+    from flask import has_request_context
+    user_id = current_user_id()
+    with raw_state() as data:
+        if not has_request_context() or test_demo_enabled():
+            yield data
+            return
+        original_preferences = data['preferences']
+        data['preferences'] = data.setdefault('userPreferences', {}).setdefault(user_id, dict(sports=[], following=[], city='', state='', country=''))
+        for post in data['posts']:
+            # Preserve legacy aggregate likes but isolate new users' interactions.
+            post['liked'] = user_id in post.get('likedBy', [])
+            post['saved'] = user_id in post.get('savedBy', [])
+        try:
+            yield data
+            for post in data['posts']:
+                for flag, collection in (('liked', 'likedBy'), ('saved', 'savedBy')):
+                    members = post.setdefault(collection, [])
+                    if post[flag] and user_id not in members:
+                        members.append(user_id)
+                    elif not post[flag] and user_id in members:
+                        members.remove(user_id)
+        finally:
+            data['preferences'] = original_preferences
+            for post in data['posts']:
+                post['liked'] = False
+                post['saved'] = False
+
+
 def rank(post, data=None):
     if data is None:
         return None
@@ -73,14 +106,23 @@ def public(post, data):
     from arena import ensure_arena
     player = next((p for p in ensure_arena(data)['players'] if p['id'] == post.get('authorId')), None)
     identity = {key: player[key] for key in ('name', 'initials')} if player else {}
-    return {**{key: value for key, value in post.items() if key != 'baseSaves'}, **identity, 'avatar': player.get('avatar', '') if player else '', 'rank': rank(post, data), 'time': post['createdAt']}
+    allowed = can_view_photos(data, post.get('authorId'))
+    result = {**{key: value for key, value in post.items() if key not in ('baseSaves', 'likedBy', 'savedBy', 'reactionsBy')}, **identity, 'reactionCounts': {key: list(post.get('reactionsBy', {}).values()).count(key) for key in ('fire', 'mvp', 'clap')}, 'myReaction': post.get('reactionsBy', {}).get(current_user_id()), 'avatar': player.get('avatar', '') if player and allowed else '', 'rank': rank(post, data), 'time': post['createdAt']}
+    if not allowed:
+        for key in ('image', 'avatar', 'cover'):
+            if key in result:
+                result[key] = ''
+    return redact_photo_aliases(result, data)
 
 
 def active_stories(data):
-    return [story for story in data['stories'] if datetime.fromisoformat(story['expiresAt']) > now()]
+    return [redact_photo_aliases(story, data) for story in data['stories']
+            if datetime.fromisoformat(story['expiresAt']) > now() and visible_photo_item(story, data)]
 
 
 def body():
+    if request.path.startswith('/api/auth/') and hasattr(g, 'auth_payload'):
+        return g.auth_payload
     value = request.get_json(silent=True)
     return value if isinstance(value, dict) else {}
 
@@ -93,10 +135,24 @@ def valid_sport(value):
     return isinstance(value, str) and value in SPORTS
 
 
+def media_image(image):
+    """Accept raster uploads or HTTP(S) links; reject active content."""
+    if isinstance(image, str) and image.startswith('data:'):
+        from arena import validate_avatar
+        return validate_avatar(image, full_photo=True)
+    try:
+        url = urlparse(image) if isinstance(image, str) else None
+        if url is not None and url.scheme in ('http', 'https') and bool(url.hostname) and not url.username and len(image) <= 2048:
+            return image
+    except ValueError:
+        pass
+    raise ValueError('Choose a JPG, PNG or WebP photo, or a valid HTTP(S) image URL')
+
+
 @social.get('/feed')
 def feed():
     mode = request.args.get('mode', 'for-you')
-    if mode not in ('for-you', 'following', 'local'):
+    if mode not in ('global', 'country', 'state', 'for-you', 'following', 'local'):
         return jsonify(error='Unknown feed mode'), 400
     with state() as data:
         preferences = data['preferences']
@@ -105,12 +161,25 @@ def feed():
         query = request.args.get('q', '').casefold().strip()
         scored_at = now()
         from arena import discovery_influence, ensure_arena
-        _, influence_sources = discovery_influence(ensure_arena(data))
+        value = ensure_arena(data)
+        _, influence_sources = discovery_influence(value)
+        from geography import location_bucket
+        current_player = next(p for p in value['players'] if p['id'] == current_user_id())
+        country, region = current_player['country'], current_player['state']
+        preferences = {**preferences, 'country': country, 'state': region}
+
+        def in_scope(item):
+            bucket = location_bucket(item, country, region)
+            return (mode != 'country' or bucket < 2) and (mode != 'state' or bucket == 0)
+
+        def discovery_sources(post):
+            if mode == 'following':
+                return []
+            return [source for source in influence_sources.get(post['authorId'], [])
+                    if source['sport'] == post['sport'] and source['boost'] > 0]
 
         def discovery_boost(post):
-            if mode == 'following':
-                return 0
-            return max((source['boost'] for source in influence_sources.get(post['authorId'], []) if source['sport'] == post['sport']), default=0)
+            return max((source['boost'] for source in discovery_sources(post)), default=0)
 
         affinity = {sport: 6 for sport in preferences['sports']}
         for post in data['posts']:
@@ -120,15 +189,20 @@ def feed():
             hours = max(0, (scored_at - datetime.fromisoformat(post['createdAt'])).total_seconds() / 3600)
             locality = post['city'].casefold() == city.casefold()
             tier = {None: 0, 'Silver': 1, 'Gold': 2, 'Diamond': 3, 'Star': 4}[rank(post, data)]
-            return (affinity.get(post['sport'], 0) if mode == 'for-you' else 0) + 5 * (post['name'] in preferences['following']) + 12 / (1 + hours / 12) + locality * (2 + tier * 1.5) + min(4, math.log1p(post['likes']) / 2) + discovery_boost(post)
+            return (affinity.get(post['sport'], 0) if mode in ('for-you', 'global', 'country', 'state') else 0) + 5 * (post['name'] in preferences['following']) + 12 / (1 + hours / 12) + locality * (2 + tier * 1.5) + min(4, math.log1p(post['likes']) / 2) + discovery_boost(post)
 
-        posts = [post for post in data['posts'] if
+        posts = [post for post in data['posts'] if visible_photo_item(post, data) and
                  (sport in ('All sports', 'All', '') or post['sport'].casefold() == sport.casefold()) and
                  (not query or query in ' '.join([post['text'], post['name'], post['sport'], post['city']]).casefold()) and
                  (mode != 'following' or post['name'] in preferences['following']) and
+                 in_scope(post) and
                  (mode != 'local' or post['city'].casefold() == city.casefold())]
-        posts.sort(key=lambda post: (-score(post), post['id']))
-        return jsonify(posts=[{**public(post, data), 'discoveryBoost': discovery_boost(post)} for post in posts], stories=active_stories(data), preferences=preferences)
+        posts.sort(key=lambda post: ((location_bucket(post, country, region) if mode in ('global', 'country', 'state') else 0), -score(post), post['id']))
+        return jsonify(posts=[{**public(post, data), 'discoveryBoost': discovery_boost(post),
+                               'discoverySources': [source for source in discovery_sources(post)
+                                                    if source['boost'] == discovery_boost(post)]}
+                              for post in posts], stories=[s for s in active_stories(data) if in_scope(s)], preferences=preferences,
+                       scope=dict(mode=mode, country=country, state=region))
 
 
 @social.route('/preferences', methods=['GET', 'PATCH'])
@@ -139,11 +213,20 @@ def preferences():
             return jsonify(error='Choose valid sports'), 400
         if 'city' in payload and not string(payload['city'], 80):
             return jsonify(error='City is required (maximum 80 characters)'), 400
+        for key in ('country', 'state'):
+            if key in payload and not string(payload[key], 80):
+                return jsonify(error=f'{key} is required (maximum 80 characters)'), 400
     with state() as data:
+        from arena import ensure_arena
+        value = ensure_arena(data)
         if request.method == 'PATCH':
-            for key in ('sports', 'city'):
+            for key in ('sports', 'city', 'country', 'state'):
                 if key in payload:
-                    data['preferences'][key] = payload[key].strip() if key == 'city' else list(dict.fromkeys(payload[key]))
+                    data['preferences'][key] = list(dict.fromkeys(payload[key])) if key == 'sports' else payload[key].strip()
+            player = next(p for p in value['players'] if p['id'] == current_user_id())
+            for key in ('country', 'state', 'city'):
+                if key in payload:
+                    player[key] = data['preferences'][key]
         return jsonify(data['preferences'])
 
 
@@ -152,7 +235,13 @@ def create_post():
     payload = body()
     if not string(payload.get('text'), 3000) or not valid_sport(payload.get('sport')):
         return jsonify(error='Text (1-3000 characters) and a valid sport are required'), 400
+    try:
+        image = media_image(payload['image']) if payload.get('image') else ''
+    except ValueError as error:
+        return jsonify(error=str(error)), 400
     with state() as data:
+        from arena import ensure_arena
+        ensure_arena(data)
         community = None
         if 'communityId' in payload:
             from arena import ensure_arena
@@ -163,9 +252,11 @@ def create_post():
                 return jsonify(error='Arena not found'), 404
             if payload['sport'] != community['sport']:
                 return jsonify(error='Post sport must match the Arena sport'), 400
-        post = dict(id=uuid4().hex, authorId='demo-user', name='You', initials='YO', sport=payload['sport'],
-                    text=payload['text'].strip(), image='', likes=0, baseSaves=0, comments=[], liked=False, saved=False,
+        post = dict(id=uuid4().hex, authorId=current_user_id(), name=next(p['name'] for p in data['arena']['players'] if p['id'] == current_user_id()), initials=next(p['initials'] for p in data['arena']['players'] if p['id'] == current_user_id()), sport=payload['sport'],
+                    text=payload['text'].strip(), image=image, likes=0, baseSaves=0, comments=[], liked=False, saved=False,
                     city=community['city'] if community else data['preferences']['city'], createdAt=now().isoformat())
+        # A post keeps the author's location at publication, even after a profile move.
+        post.update(country=data['preferences']['country'], state=data['preferences']['state'])
         if community:
             post['communityId'] = community['id']
         data['posts'].append(post)
@@ -174,22 +265,32 @@ def create_post():
 
 @social.post('/posts/<post_id>/<action>')
 def engage(post_id, action):
-    if action not in ('like', 'save', 'comments'):
+    if action not in ('like', 'save', 'comments', 'reaction'):
         return jsonify(error='Unknown action'), 404
     payload = body()
+    if action == 'reaction' and payload.get('reaction') not in ('fire', 'mvp', 'clap'):
+        return jsonify(error='Choose a valid reaction'), 400
     if action == 'comments' and not string(payload.get('text'), 1000):
         return jsonify(error='Comment must contain 1-1000 characters'), 400
     with state() as data:
         post = next((p for p in data['posts'] if p['id'] == post_id), None)
-        if post is None:
+        if post is None or not visible_photo_item(post, data):
             return jsonify(error='Post not found'), 404
         if action == 'like':
             post['liked'] = not post['liked']
             post['likes'] += 1 if post['liked'] else -1
+        elif action == 'reaction':
+            reactions = post.setdefault('reactionsBy', {})
+            if reactions.get(current_user_id()) == payload['reaction']:
+                reactions.pop(current_user_id())
+            else:
+                reactions[current_user_id()] = payload['reaction']
         elif action == 'save':
             post['saved'] = not post['saved']
         else:
-            post['comments'].append(dict(name='You', text=payload['text'].strip()))
+            from arena import ensure_arena
+            author = next(p for p in ensure_arena(data)['players'] if p['id'] == current_user_id())
+            post['comments'].append(dict(authorId=current_user_id(), name=author['name'], text=payload['text'].strip()))
         return jsonify(public(post, data))
 
 
@@ -199,7 +300,11 @@ def follow():
     if not string(name, 100) or name == 'You':
         return jsonify(error='A valid athlete name is required'), 400
     with state() as data:
-        if name not in {p['name'] for p in data['posts']}:
+        from arena import ensure_arena
+        players = ensure_arena(data)['players']
+        if name == next(p['name'] for p in players if p['id'] == current_user_id()):
+            return jsonify(error='You cannot follow yourself'), 400
+        if name not in {p['name'] for p in players} | {p['name'] for p in data['posts']}:
             return jsonify(error='Athlete not found'), 404
         following = data['preferences']['following']
         following.remove(name) if name in following else following.append(name)
@@ -210,19 +315,19 @@ def follow():
 def stories():
     payload = body()
     if request.method == 'POST':
-        image = payload.get('image')
         try:
-            url = urlparse(image) if isinstance(image, str) else None
-            valid_url = url is not None and url.scheme in ('http', 'https') and bool(url.hostname) and not url.username and len(image) <= 2048
+            image = media_image(payload.get('image'))
         except ValueError:
-            valid_url = False
-        if not valid_url or not valid_sport(payload.get('sport')) or not isinstance(payload.get('text', ''), str) or len(payload.get('text', '')) > 500:
-            return jsonify(error='A valid HTTP(S) image URL, sport, and text up to 500 characters are required'), 400
+            return jsonify(error='A valid photo or HTTP(S) image URL is required'), 400
+        if not valid_sport(payload.get('sport')) or not isinstance(payload.get('text', ''), str) or len(payload.get('text', '')) > 500:
+            return jsonify(error='A valid sport and text up to 500 characters are required'), 400
     with state() as data:
+        from arena import ensure_arena
+        ensure_arena(data)
         if request.method == 'GET':
             return jsonify(stories=active_stories(data))
-        from arena import ensure_arena, CURRENT_USER
-        player = next(p for p in ensure_arena(data)['players'] if p['id'] == CURRENT_USER)
-        story = dict(id=uuid4().hex, authorId=CURRENT_USER, name=player['name'], initials=player['initials'], image=payload['image'], sport=payload['sport'], text=payload.get('text', '').strip(), expiresAt=(now() + timedelta(hours=24)).isoformat())
+        from arena import ensure_arena
+        player = next(p for p in ensure_arena(data)['players'] if p['id'] == current_user_id())
+        story = dict(id=uuid4().hex, authorId=current_user_id(), name=player['name'], initials=player['initials'], image=image, sport=payload['sport'], country=player['country'], state=player['state'], text=payload.get('text', '').strip(), expiresAt=(now() + timedelta(hours=24)).isoformat())
         data['stories'].append(story)
         return jsonify(story), 201

@@ -16,7 +16,11 @@ RUN pip install \
 
 COPY app.py .
 COPY db.py .
-COPY social.py arena.py ./
+COPY social.py arena.py geography.py auth.py messages.py friends.py password_reset.py privacy.py organisations.py ./
+COPY auth_envelope.py tournament_verification.py tournament_activation.py ./
+COPY account_activation.py google_auth.py progression.py reminders.py ./
+COPY play_games.py ./
+COPY start.sh .
 COPY static ./static
 
 RUN chown -R appuser:appgroup /app
@@ -25,9 +29,4 @@ USER appuser
 
 EXPOSE 8080
 
-CMD ["gunicorn", \
-     "--bind", "0.0.0.0:8080", \
-     "--workers", "2", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-", \
-     "app:app"]
+CMD ["/bin/sh", "/app/start.sh"]

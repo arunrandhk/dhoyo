@@ -1,0 +1,472 @@
+/* Shared visual system, loaded after feature styles. All fonts and art are local. */
+@font-face {
+  font-family: "Ubuntu Sans";
+  src: url("assets/fonts/UbuntuSans-variable.ttf") format("truetype");
+  font-weight: 100 900;
+  font-stretch: 75% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-body: "Ubuntu Sans", Arial, sans-serif;
+  --font-display: "Ubuntu Sans", Arial, sans-serif;
+  --accent: #d5f76b;
+  --green: var(--accent);
+  --ink: #f2f5ef;
+  --muted: #9ba69d;
+  --line: #2b342e;
+  --surface: #141a17;
+  --surface-raised: #1b231d;
+  --sidebar-width: 240px;
+  font-family: var(--font-body);
+  background: #0c100e;
+  color: var(--ink);
+  font-synthesis: none;
+}
+
+body, body.ring-experience {
+  --line: #2b342e;
+  --green: var(--accent);
+  font-family: var(--font-body);
+  background: #0c100e;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: var(--accent); color: #10170d; }
+button, input, textarea, select { font-family: inherit; }
+button, a { touch-action: manipulation; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+:is(h1, h2, h3, .brand) { font-family: var(--font-display); }
+small { color: var(--muted); line-height: 1.5; }
+[hidden] { display: none !important; }
+
+body.ring-experience .sidebar {
+  width: var(--sidebar-width);
+  padding: 32px 20px 24px;
+  background: #111612;
+  border-right: 1px solid var(--line);
+  box-shadow: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.shell { margin-left: var(--sidebar-width); padding-bottom: 28px; }
+.sidebar .brand { gap: 8px; font-size: 33px; letter-spacing: -1.7px; }
+.sidebar .brand-mark {
+  width: 34px;
+  height: 36px;
+  border-radius: 11px 11px 11px 3px;
+  background: var(--accent);
+  color: #10170d;
+  font-size: 34px;
+  font-weight: 850;
+  font-style: italic;
+  line-height: 1;
+  padding-right: 3px;
+  margin-right: 3px;
+}
+.ring-wordmark-dot { margin-left: -7px; color: var(--accent); }
+body.ring-experience .workspace-label {
+  margin: 43px 12px 15px;
+  color: #97a494;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+}
+body.ring-experience .sidebar nav { gap: 5px; }
+body.ring-experience .sidebar nav button {
+  min-height: 48px;
+  padding: 13px 15px;
+  border-radius: 9px;
+  color: #b1bcb1;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 12px;
+}
+body.ring-experience .sidebar nav button:hover { background: #20291f; color: var(--ink); }
+body.ring-experience .sidebar nav button.active {
+  background: var(--accent);
+  color: #18210f;
+  font-weight: 700;
+  box-shadow: none;
+}
+.sidebar .nav-icon { width: 19px; height: 19px; }
+.ring-membership { padding: 10px 12px; font-size: 12px; border-radius: 8px; }
+.ring-membership:hover { background: #20291f; }
+.ring-membership > img { width: 31px; height: 31px; border-radius: 8px; }
+.sidebar-play-card {
+  display: grid;
+  gap: 17px;
+  margin: 34px 4px 28px;
+  padding: 20px 17px;
+  border: 1px solid #39482e;
+  border-radius: 12px;
+  background: #1d2917;
+}
+.sidebar-play-kicker { color: #b6c99b; font-size: 9px; font-weight: 700; letter-spacing: 1px; }
+.sidebar-play-card > strong { font-size: 26px; line-height: 1.07; letter-spacing: -1px; color: #ebf3e0; }
+.sidebar-play-link { display: flex; justify-content: space-between; color: var(--accent); font-size: 12px; }
+.sidebar-play-link > span { font-size: 19px; line-height: 1; }
+.sidebar-play-card:hover { border-color: #6c8452; }
+body.ring-experience .sidebar-bottom { margin-top: auto; padding: 22px 5px 0; border-color: var(--line); font-size: 13px; }
+body.ring-experience .sidebar-bottom small { color: var(--muted); font-size: 11px; }
+
+body.ring-experience .topbar {
+  min-height: 83px;
+  height: auto;
+  padding: 20px 38px;
+  gap: 20px;
+  background: #0c100ef2;
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: blur(16px);
+}
+body.ring-experience .top-title { color: #e2e9dd; font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
+body.ring-experience .search {
+  width: min(340px, 42%);
+  padding: 12px 15px;
+  background: #161d18;
+  border: 1px solid #303b31;
+  border-radius: 9px;
+}
+body.ring-experience .search input { color: var(--ink); font-size: 13px; }
+body.ring-experience .search input::placeholder { color: #99a597; }
+body.ring-experience .search:focus-within { outline: 2px solid var(--accent); }
+.account-logout { font-size: 12px; color: #bcc7b5; padding: 10px 0; }
+.topbar :is(.messages-trigger, .stickers-trigger) { min-height: 40px; border-radius: 8px; border-color: #3e5034; background: #1c2919; }
+.topbar :is(.messages-trigger, .stickers-trigger):hover { background: #2a3a21; border-color: #799855; }
+main { padding: 34px 38px 45px; max-width: 1480px; }
+.page-heading { margin-bottom: 18px; gap: 22px; }
+.page-heading h1 { font-size: clamp(30px, 3vw, 44px); font-weight: 750; letter-spacing: -1.4px; line-height: 1.1; text-wrap: balance; }
+.eyebrow { font-size: 10px; font-weight: 650; letter-spacing: 1.5px; color: var(--accent); }
+#subtitle { font-size: 14px; line-height: 1.6; color: var(--muted); margin-top: 10px; }
+.primary {
+  min-height: 44px;
+  padding: 12px 18px;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  color: #15200b;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: none;
+  transition: background 160ms ease, transform 160ms ease;
+}
+.primary:hover { background: #e1ff8d; border-color: #e1ff8d; box-shadow: none; }
+.primary:active { box-shadow: none; }
+body.ring-home main > .filters { display: none; }
+.filters { gap: 8px; padding: 14px 0 26px; scrollbar-width: none; }
+body.ring-experience .chip {
+  min-height: 39px;
+  padding: 9px 17px;
+  background: transparent;
+  border: 1px solid #344031;
+  color: #bac5b6;
+  border-radius: 30px;
+  font-size: 12px;
+  font-weight: 500;
+}
+body.ring-experience .chip:hover { background: #20291d; border-color: #62744a; }
+body.ring-experience .chip.active { background: var(--accent); border-color: var(--accent); color: #19200f; box-shadow: none; }
+
+/* One purposeful hero leads into the feed and the player's connection map. */
+body.ring-experience .clubhouse-hero {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1.08fr 1fr;
+  align-items: stretch;
+  gap: 0;
+  min-height: 330px;
+  margin: 0 0 34px;
+  padding: 0;
+  border: 1px solid #34412e;
+  border-radius: 18px;
+  background: #1c2717;
+  box-shadow: none;
+  overflow: hidden;
+}
+body.ring-experience .clubhouse-hero::after { display: none; }
+body.ring-experience .clubhouse-hero > div { max-width: none; min-width: 0; }
+.clubhouse-hero-copy { position: relative; z-index: 1; padding: 36px 38px; }
+.clubhouse-hero-kicker { display: block; color: #cadcaa; font-size: 10px; letter-spacing: 1.8px; font-weight: 650; }
+body.ring-experience .clubhouse-hero .clubhouse-hero-title {
+  max-width: none;
+  margin: 20px 0 18px;
+  color: var(--ink);
+  font-size: clamp(38px, 4.1vw, 65px);
+  font-weight: 800;
+  font-stretch: 80%;
+  line-height: .99;
+  letter-spacing: -2.7px;
+  text-wrap: initial;
+}
+.clubhouse-hero-title > span { color: var(--accent); }
+.clubhouse-hero-description { max-width: 370px; font-size: 14px; line-height: 1.7; color: #b8c7ae; margin: 0; }
+.clubhouse-hero-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 13px; margin-top: 25px; }
+.clubhouse-hero-link, .clubhouse-hero-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 14px; min-height: 46px; padding: 12px 16px; border-radius: 7px; font-size: 13px; font-weight: 650; }
+.clubhouse-hero-link { color: #18210f; background: var(--accent); border: 1px solid var(--accent); }
+.clubhouse-hero-link:hover { background: #e1ff8d; }
+.clubhouse-hero-secondary { color: #e1ecd4; border: 1px solid #63734e; }
+.clubhouse-hero-secondary:hover { background: #2d3b23; border-color: #b0cb7d; }
+.clubhouse-hero-actions img { width: 17px; height: 17px; }
+.clubhouse-hero-link img { filter: none; }
+.clubhouse-hero-secondary img { filter: invert(.8); }
+.clubhouse-hero-art { position: relative; min-height: 100%; isolation: isolate; }
+.clubhouse-hero-art > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 37% center; }
+.clubhouse-hero-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #1c2717, transparent 38%), linear-gradient(0deg, #07100bb3, transparent 50%); }
+.clubhouse-hero-caption { position: absolute; z-index: 1; right: 25px; bottom: 24px; color: #deecd3; font-size: 9px; font-weight: 600; letter-spacing: 1.8px; }
+
+.ring-layout.unified-home { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(310px, .9fr); gap: 28px; align-items: start; }
+.feed-section-heading { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 0 0 16px; }
+.feed-section-heading h2 { font-size: 22px; font-weight: 650; margin: 0; letter-spacing: -.7px; }
+.feed-section-heading > span { color: var(--muted); font-size: 12px; }
+.ring-stories { gap: 10px; padding-bottom: 27px; margin-bottom: 7px; }
+.ring-story { width: 106px; min-width: 106px; height: 142px; border: 1px solid #586c43; border-radius: 11px; }
+.ring-story-name { font-size: 11px; bottom: 12px; left: 10px; }
+.ring-story-sport { font-size: 9px; padding: 5px 6px; border-radius: 4px; }
+.ring-story-add { background: #171f15; border: 1px dashed #6b7e52; }
+.ring-story-add .avatar { width: 42px; height: 42px; border: 1px solid #61734c; background: #26331d; }
+.ring-interest-button { min-height: 40px; font-size: 12px; padding: 8px 0 8px 8px; gap: 7px; color: #bfcca9; }
+body.ring-experience .composer { padding: 16px; gap: 12px; margin-bottom: 22px; background: #171f18 !important; border: 1px solid #35412e; border-radius: 12px !important; }
+body.ring-experience .composer > button { min-height: 44px; padding: 12px 14px; background: #222c20; border-color: #3b4830; border-radius: 8px; color: #b9c6b0; font-size: 13px; }
+.composer .ring-photo-button { flex: 0 0 44px; }
+
+body.ring-experience .post { background: var(--surface); border: 1px solid #303b2e !important; border-radius: 14px !important; box-shadow: none !important; margin-bottom: 25px; }
+body.ring-experience .post-heading { padding: 21px 22px 16px; background: none; gap: 12px; }
+.post-heading .avatar { width: 43px; height: 43px; border-radius: 50%; border-color: #536346; box-shadow: none; }
+.post-heading :is(strong, .player-name) { font-size: 14px; font-weight: 650; }
+body.ring-experience .post-heading small { color: #a2b095; font-size: 11px; line-height: 1.6; margin-top: 4px; }
+body.ring-experience .post-text { color: #dfe6d8; padding-inline: 22px; font-size: 14px; line-height: 1.75; margin-bottom: 19px; }
+.post-image-wrap { background: #0c100e; }
+.post-image { max-height: 560px; background: #101610; }
+.game-reactions { gap: 7px; padding: 17px 20px 6px; }
+.game-reaction { background: #1b2619; border-color: #38462e; color: #c0cbb2; padding: 8px 11px; font-size: 11px; }
+.game-reaction b { background: #11190e; }
+.game-emoji { font-size: 18px; filter: none; }
+body.ring-experience .post-actions { padding: 13px 22px; border-color: var(--line); }
+.post-actions button { min-height: 35px; font-size: 12px; }
+.post-actions-left { gap: 20px; }
+.ring-image-badge { background: #111b10ed; border-color: #657d43; border-radius: 6px; font-size: 11px; }
+body.ring-experience .post-social-proof { color: #a8b69b; border-color: var(--line); font-size: 12px; }
+.comment-form { padding: 15px 21px; }
+body.ring-experience .comment-form input { min-height: 41px; padding: 11px 13px; background: #20291d; border: 1px solid #35422d; border-radius: 8px; font-size: 13px; color: var(--ink); }
+.comment-form button { min-width: 40px; }
+.comment { padding-inline: 22px; font-size: 13px; }
+.rank-badge { border-radius: 5px; box-shadow: none; }
+
+/* Connections remain prominent, with a calmer hierarchy and clear labels. */
+.home-connections { top: 24px; }
+body.ring-experience .home-connections .ring-network { padding: 24px 16px; background: #151e14; border: 1px solid #36462d; border-radius: 14px; box-shadow: none; }
+.home-connections .network-heading { padding: 0 4px; }
+.home-connections .network-heading h2 { font-size: 24px; line-height: 1.12; letter-spacing: -.7px; }
+.home-connections .network-heading .eyebrow { font-size: 9px; letter-spacing: 1px; }
+.network-root { width: min(255px, 100%); height: 52px; background: #2b3d1d; border-color: #6f8b45; border-radius: 9px; }
+.network-root-symbol { box-shadow: none; background: var(--accent); }
+.network-level-label { font-size: 9px; line-height: 1.6; color: #a9bd98; }
+.network-node { background: #1f2b19; border-color: #405335; border-radius: 9px; min-height: 77px; }
+.network-node-copy strong { font-size: 12px; }
+.network-node-copy small { font-size: 10px; color: #afc09e; }
+.network-empty { background: #172113; color: #b3c3a4; font-size: 12px; line-height: 1.8; border-color: #485c37; padding: 20px 15px; border-radius: 8px; }
+.network-empty a { font-size: 12px; }
+.network-summary { font-size: 11px; line-height: 1.6; color: #aabc99; border-color: #36492b; }
+.hub-link { min-height: 42px; font-size: 12px; line-height: 1.6; color: var(--accent); }
+
+/* Discovery, bookings and profiles share the same surfaces and type scale. */
+body.ring-experience :is(.ring-community, .listing, .connection-team-card, .connection-player-card, .org-card, .org-booking, .org-metrics > div) { background: var(--surface); border-color: #36422f; border-radius: 13px; box-shadow: none; }
+body.ring-experience .ring-community-info { padding: 23px; background: var(--surface); }
+.ring-community-info h3 { font-size: 25px; font-weight: 650; letter-spacing: -.7px; margin: 12px 0; }
+body.ring-experience .ring-community-info small { color: var(--muted); font-size: 12px; line-height: 1.7; }
+.ring-community-info p { font-size: 13px; line-height: 1.7; }
+.ring-community > a > img { height: 230px; }
+.ring-community-grid { gap: 22px; }
+.ring-section-heading h2 { font-size: 22px; letter-spacing: -.6px; }
+.ring-section-heading :is(a, button) { min-height: 36px; font-size: 12px; display: inline-flex; align-items: center; }
+.listing-body { padding: 23px; }
+.listing h2 { font-size: 23px; font-weight: 650; letter-spacing: -.5px; }
+.listing p { font-size: 13px; }
+.listing-meta { font-size: 11px; letter-spacing: .7px; }
+.org-service-nav a { min-height: 43px; padding: 11px 15px; border-radius: 30px; font-size: 13px; }
+.org-card h2 { font-size: 26px; font-weight: 650; letter-spacing: -.6px; }
+.org-card > p { font-size: 13px; }
+.org-details dt { font-size: 12px; }
+.org-details dd { font-size: 13px; }
+.org-card-footer { border-color: #37462e; }
+.org-button { min-height: 43px; font-size: 12px; }
+.org-empty { padding: 44px 25px; background: #141c11; border-color: #435736; }
+.org-empty h3 { font-size: 25px; letter-spacing: -.6px; }
+.org-empty p { font-size: 14px; line-height: 1.7; }
+.org-metrics span { font-size: 13px; }
+.hub-profile { background: var(--surface); border-color: #35462c; border-radius: 16px; }
+.hub-identity { padding: 28px; }
+.hub-identity h2 { font-size: 36px; letter-spacing: -1.1px; font-weight: 700; }
+.hub-identity p { font-size: 13px; }
+.hub-tabs a { min-height: 44px; font-size: 13px; }
+.hub-profile-actions > button { min-height: 44px; font-size: 12px; }
+.hub-stats span { font-size: 12px; }
+.hub-content h2 { font-size: 25px; letter-spacing: -.5px; }
+.ring-empty { padding: 32px 26px; background: #151e13; border: 1px dashed #4f653b; border-radius: 12px; color: #bdcbb1; }
+.ring-empty h2 { font-size: 25px; line-height: 1.2; letter-spacing: -.5px; margin: 0 0 12px; }
+.ring-empty p { font-size: 14px; }
+body.ring-experience footer { color: #94a18c; border-color: var(--line); padding: 24px 38px; font-size: 11px; letter-spacing: .3px; }
+
+dialog { padding: 28px; border-radius: 14px; background: #151e13; border-color: #526743; }
+.modal-heading h2 { font-size: 26px; letter-spacing: -.5px; }
+.field { font-size: 13px; }
+.field :is(input, textarea, select) { min-height: 46px; font-size: 14px; border-radius: 8px; }
+.modal-note { font-size: 13px; }
+#toast { bottom: 25px !important; border-radius: 10px; font-size: 13px; }
+body.ring-experience .app-bottom-nav { display: none; }
+
+@media (min-width: 1650px) {
+  .clubhouse-hero-copy { padding: 45px; }
+  body.ring-experience .clubhouse-hero .clubhouse-hero-title { font-size: 70px; }
+}
+
+@media (max-width: 1200px) {
+  :root { --sidebar-width: 210px; }
+  body.ring-experience .sidebar { padding-inline: 15px; }
+  body.ring-experience .topbar { padding-inline: 26px; gap: 14px; }
+  main { padding: 29px 26px 40px; }
+  .ring-layout.unified-home { grid-template-columns: minmax(0, 1.3fr) minmax(290px, 1fr); gap: 22px; }
+  .clubhouse-hero-copy { padding: 29px 27px; }
+  body.ring-experience .clubhouse-hero .clubhouse-hero-title { font-size: 47px; }
+  .clubhouse-hero-actions { gap: 10px; }
+  .clubhouse-hero-link, .clubhouse-hero-secondary { font-size: 12px; padding: 11px 12px; gap: 8px; }
+  body.ring-experience .top-title { font-size: 13px; }
+}
+
+@media (max-width: 1000px) {
+  body.ring-experience .top-title { display: none; }
+  body.ring-experience .search { flex: 1; width: auto; margin-right: 0; }
+  .ring-layout.unified-home { display: flex; flex-direction: column; }
+  .ring-feed { width: 100%; min-width: 0; }
+  .home-connections { position: static; width: 100%; order: -1; }
+  .home-connections #network-tree { max-height: 290px; }
+  .sidebar-play-card { margin-top: 24px; }
+  body.ring-experience .clubhouse-hero { grid-template-columns: 1fr .8fr; min-height: 325px; }
+  .clubhouse-hero-copy { padding: 28px 25px; }
+  body.ring-experience .clubhouse-hero .clubhouse-hero-title { font-size: 43px; letter-spacing: -1.7px; }
+  .clubhouse-hero-description { font-size: 13px; }
+  .clubhouse-hero-actions { flex-direction: column; align-items: flex-start; gap: 9px; }
+}
+
+@media (max-width: 760px) {
+  :root { --sidebar-width: 0px; }
+  body.ring-experience .sidebar { position: relative; width: 100%; padding: 18px 22px; background: #111612; border-right: 0; border-bottom: 1px solid var(--line); box-shadow: none; overflow: visible; }
+  .sidebar > nav, .sidebar .workspace-label, #ring-memberships, .sidebar-play-card, .sidebar-bottom { display: none; }
+  .sidebar .brand { font-size: 29px; }
+  .sidebar .brand-mark { width: 29px; height: 31px; font-size: 29px; border-radius: 9px 9px 9px 2px; }
+  .shell { margin-left: 0; padding-bottom: calc(90px + env(safe-area-inset-bottom)); }
+  body.ring-experience .topbar { min-height: 67px; padding: 12px 20px; gap: 12px; flex-wrap: wrap; }
+  body.ring-experience .search { padding: 11px 12px; flex-basis: 44%; }
+  .topbar .account-logout { font-size: 11px; }
+  main { padding: 26px 20px 32px; }
+  .page-heading { align-items: flex-start; margin-bottom: 22px; gap: 12px; }
+  .page-heading h1 { max-width: none; font-size: 31px; line-height: 1.08; letter-spacing: -1.1px; }
+  .page-heading .primary { font-size: 12px; min-height: 42px; padding: 11px 13px; }
+  #subtitle { font-size: 13px; max-width: 320px; line-height: 1.6; }
+  .eyebrow { font-size: 9px; }
+  body.ring-home .page-heading > div { flex: 1; }
+  body.ring-home #subtitle { display: none; }
+  body.ring-experience .clubhouse-hero { grid-template-columns: 1fr; min-height: 0; border-radius: 14px; margin-bottom: 25px; }
+  .clubhouse-hero-copy { padding: 29px 26px; }
+  body.ring-experience .clubhouse-hero .clubhouse-hero-title { font-size: clamp(40px, 8.5vw, 62px); margin: 17px 0; letter-spacing: -1.9px; }
+  .clubhouse-hero-description { max-width: 370px; font-size: 14px; line-height: 1.6; }
+  .clubhouse-hero-actions { flex-direction: row; flex-wrap: wrap; margin-top: 23px; gap: 11px; }
+  .clubhouse-hero-link, .clubhouse-hero-secondary { min-height: 45px; font-size: 13px; padding: 12px 15px; }
+  .clubhouse-hero-art { min-height: 170px; }
+  .clubhouse-hero-art > img { object-position: center 61%; }
+  .clubhouse-hero-art::after { background: linear-gradient(180deg, #1c2717 0%, transparent 35%), linear-gradient(0deg, #07100b99, transparent 50%); }
+  .clubhouse-hero-caption { right: 21px; bottom: 20px; }
+  .ring-layout.unified-home { gap: 24px; }
+  .home-connections { margin-bottom: 0; }
+  body.ring-experience .home-connections .ring-network { padding: 21px 16px; margin-bottom: 7px; }
+  .home-connections .network-heading h2 { font-size: 22px; max-width: none; }
+  .network-empty { font-size: 12px; padding: 17px 13px; }
+  .network-heading .network-toggle { min-height: 42px; }
+  .feed-section-heading h2 { font-size: 21px; }
+  .feed-section-heading > span { font-size: 11px; }
+  .ring-interest-button { font-size: 11px !important; }
+  .ring-stories { gap: 10px; padding-bottom: 21px; }
+  .ring-story { width: 95px; min-width: 95px; height: 135px; }
+  .ring-story-name { font-size: 11px; }
+  .ring-story-sport { font-size: 8px; }
+  .filters { padding: 10px 0 23px; gap: 8px; }
+  body.ring-experience .chip { min-height: 40px; padding: 10px 15px; font-size: 12px; }
+  body.ring-experience .composer { padding: 13px; gap: 10px; }
+  body.ring-experience .composer > button { font-size: 12px; padding: 10px 12px; }
+  .composer .avatar { width: 35px; height: 35px; font-size: 11px; }
+  body.ring-experience .composer .ring-photo-button { flex: 0 0 40px; padding: 10px; }
+  body.ring-experience .post-heading { padding: 17px 16px 14px; gap: 10px; }
+  .post-heading :is(strong, .player-name) { font-size: 13px; }
+  body.ring-experience .post-heading small { font-size: 10px; }
+  body.ring-experience .post-text { padding-inline: 16px; font-size: 14px; }
+  .game-reactions { padding: 14px 13px 4px; gap: 6px; }
+  .game-reaction { font-size: 10px; gap: 5px; padding: 8px 9px; }
+  body.ring-experience .post-actions { padding-inline: 16px; }
+  .post-actions-left { gap: 14px; }
+  .post-actions button { font-size: 11px; }
+  .comment-form { padding: 13px 16px; }
+  .comment-form input, .search input, .field input, .field textarea, .field select { font-size: 16px; }
+  .comment { padding-inline: 16px; }
+  .ring-community-grid { grid-template-columns: 1fr; gap: 20px; }
+  body.ring-experience .ring-community-info { padding: 23px; }
+  .ring-community > a > img { height: 210px; }
+  .ring-community-info h3 { font-size: 27px; }
+  .ring-community-info small { font-size: 12px; }
+  .ring-community-cover { border-radius: 13px; height: 270px; }
+  .ring-community-title :is(h1, h2) { font-size: 30px; }
+  .org-grid { grid-template-columns: 1fr; }
+  .org-card { padding: 23px; }
+  .org-card h2 { font-size: 25px; }
+  .org-empty p { font-size: 13px; }
+  .org-service-nav { gap: 8px; }
+  .org-service-nav a { font-size: 12px; }
+  .hub-identity { padding: 22px; }
+  .hub-identity h2 { font-size: 29px; }
+  .hub-profile-actions { gap: 8px; }
+  .hub-profile-actions > button { font-size: 12px; }
+  .hub-stats strong { font-size: 25px; }
+  .hub-content h2 { font-size: 23px; }
+  .ring-empty { padding: 26px 21px; }
+  .ring-empty h2 { font-size: 24px; }
+  body.ring-experience footer { padding: 23px 20px; font-size: 10px; }
+  body.ring-experience .app-bottom-nav {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    transform: none;
+    width: 100%;
+    padding: 9px 12px max(10px, env(safe-area-inset-bottom));
+    background: #101811f5;
+    border: 1px solid #3c4c32;
+    border-width: 1px 0 0;
+    border-radius: 0;
+    box-shadow: 0 -8px 25px #0002;
+    gap: 0;
+  }
+  .app-bottom-nav > a, .app-bottom-nav > button { flex: 1; min-width: 0; min-height: 48px; padding: 6px 4px; color: #b1c2a3; gap: 5px; }
+  .app-bottom-nav > button[data-compose] { margin: -20px 7px 0; min-height: 55px; max-width: 54px; border: 4px solid #0c100e; background: var(--accent); color: #17230c; border-radius: 17px; }
+  .app-bottom-nav > button[data-compose] > img { filter: none; }
+  .app-bottom-nav > button[data-compose] > span { display: none; }
+  body.ring-experience .app-bottom-nav :is(a, button):hover, body.ring-experience .app-bottom-nav .active { background: #24351c; color: var(--accent); }
+  body.ring-experience .app-bottom-nav > button[data-compose]:hover { background: #e1ff8d; }
+  .app-bottom-nav > a > span:not(.bottom-profile-avatar) { font-size: 10px; }
+  #toast { bottom: 93px !important; }
+}
+
+@media (max-width: 370px) {
+  main { padding-inline: 15px; }
+  .clubhouse-hero-copy { padding: 25px 21px; }
+  .page-heading h1 { font-size: 27px; }
+  .page-heading .primary { font-size: 11px; padding: 10px; }
+  .clubhouse-hero-link, .clubhouse-hero-secondary { font-size: 12px; padding: 11px; }
+  .game-reaction { padding: 8px; font-size: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

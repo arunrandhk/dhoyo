@@ -163,6 +163,51 @@ def test_influence_bounded_no_stacking_or_recursive_inheritance(client):
     assert teams['team-jordan']['influence']['score'] == 1
 
 
+def test_influence_breakdown_counts_only_real_accepted_non_owner_members(client):
+    client.get('/api/arena')
+    with state() as data:
+        value = data['arena']
+        value['players'][0]['supporters'] = [str(i) for i in range(100)]
+        value['teams'][0]['members'].extend(['athlete-2', 'athlete-2', 'missing'])
+        value['teams'][0]['requests'].append(dict(id='waiting', playerId='athlete-3', status='pending'))
+    result = client.get('/api/arena').get_json()
+    influence = next(t for t in result['teams'] if t['id'] == 'team-maya')['influence']
+    assert influence['tierPoints'] == 4
+    assert influence['supportPoints'] == 1
+    assert influence['score'] == 5 and influence['memberBoost'] == 1
+    assert influence['acceptedMemberCount'] == 1
+    assert next(p for p in result['players'] if p['id'] == 'athlete-3')['discoveryBoost'] == 0
+    assert result['influenceRules']['feeds'] == ['global', 'country', 'state', 'for-you', 'local']
+
+
+def test_feed_explains_only_strongest_matching_source_and_excludes_following(client):
+    posts = {sport: client.post('/api/social/posts', json={'text': 'Match highlight', 'sport': sport}).get_json()['id']
+             for sport in ('Esports', 'Basketball', 'Cricket')}
+    assert client.post('/api/arena/teams/team-pixel/join').status_code == 201
+    pending = {p['id']: p for p in client.get('/api/social/feed').get_json()['posts']}
+    assert pending[posts['Esports']]['discoveryBoost'] == 0
+    assert pending[posts['Esports']]['discoverySources'] == []
+    with state() as data:
+        value = data['arena']
+        value['teams'][2]['members'].append('demo-user')
+        value['players'][0]['supporters'] = [str(i) for i in range(100)]
+        value['teams'].append(dict(id='basketball-squad', name='Court Squad', sport='Basketball', city='Bengaluru',
+                                  ownerId='athlete-1', members=['athlete-1', 'demo-user'], requests=[], capacity=5))
+        data['preferences']['following'] = ['Jordan Davis']
+    for mode in ('for-you', 'local'):
+        feed_posts = {p['id']: p for p in client.get('/api/social/feed?mode=' + mode).get_json()['posts']}
+        esports = feed_posts[posts['Esports']]
+        assert esports['discoveryBoost'] == 0.6
+        assert [s['teamId'] for s in esports['discoverySources']] == ['team-pixel']
+        assert all(s['boost'] == esports['discoveryBoost'] and s['sport'] == 'Esports' for s in esports['discoverySources'])
+        assert feed_posts[posts['Basketball']]['discoveryBoost'] == 1
+        assert feed_posts[posts['Cricket']]['discoveryBoost'] == 0
+        assert feed_posts[posts['Cricket']]['discoverySources'] == []
+    following = client.get('/api/social/feed?mode=following').get_json()['posts']
+    assert len(following) == 3
+    assert all(p['discoveryBoost'] == 0 and p['discoverySources'] == [] for p in following)
+
+
 def test_profile_persists_and_feed_uses_current_name(client):
     post = client.post('/api/social/posts', json={'text': 'Training today', 'sport': 'Football'}).get_json()
     response = client.patch('/api/arena/players/demo-user', json={'name': 'Alex Kumar', 'city': 'Delhi', 'sport': 'Tennis'})

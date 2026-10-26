@@ -1,0 +1,8 @@
+org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+android.useAndroidX=true
+
+# These values are public and are included in the APK. Keep secrets on the server.
+APP_BASE_URL=https://byte-ring-demo.onrender.com
+PLAY_GAMES_APPLICATION_ID=
+PLAY_GAMES_WEB_CLIENT_ID=
+PLAY_GAMES_LEADERBOARD_ID=

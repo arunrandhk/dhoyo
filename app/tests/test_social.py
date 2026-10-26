@@ -50,7 +50,7 @@ def test_mutations_persist_and_toggle(client):
     assert client.post(url + '/like').get_json()['likes'] == 1
     assert client.post(url + '/like').get_json()['likes'] == 0
     assert client.post(url + '/save').get_json()['saved']
-    assert client.post(url + '/comments', json={'text': 'Great game'}).get_json()['comments'] == [{'name': 'You', 'text': 'Great game'}]
+    assert client.post(url + '/comments', json={'text': 'Great game'}).get_json()['comments'] == [{'authorId': 'demo-user', 'name': 'Jordan Davis', 'text': 'Great game'}]
     retrieved = client.get('/api/social/feed?q=Match%20day!').get_json()['posts']
     assert retrieved[0]['saved']
 

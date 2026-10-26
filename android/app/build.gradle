@@ -1,0 +1,101 @@
+import groovy.json.JsonOutput
+
+plugins {
+    id 'com.android.application'
+}
+
+def publicSetting = { name -> providers.gradleProperty(name).getOrElse('').trim() }
+def appBaseUrl = publicSetting('APP_BASE_URL')
+def gamesApplicationId = publicSetting('PLAY_GAMES_APPLICATION_ID')
+def gamesWebClientId = publicSetting('PLAY_GAMES_WEB_CLIENT_ID')
+def gamesLeaderboardId = publicSetting('PLAY_GAMES_LEADERBOARD_ID')
+
+if (appBaseUrl) {
+    URI origin
+    try {
+        origin = new URI(appBaseUrl)
+    } catch (URISyntaxException ignored) {
+        throw new GradleException('APP_BASE_URL must be an HTTPS origin.')
+    }
+    if (origin.scheme != 'https' || !origin.host || origin.rawUserInfo != null ||
+            origin.rawQuery != null || origin.rawFragment != null ||
+            !(origin.path in ['', '/']) || (origin.port != -1 && !(origin.port in 1..65535))) {
+        throw new GradleException('APP_BASE_URL must be an HTTPS origin without a path, credentials, query or fragment.')
+    }
+    appBaseUrl = appBaseUrl.replaceAll('/$', '')
+}
+if (gamesApplicationId && !(gamesApplicationId ==~ /[1-9][0-9]{0,29}/)) {
+    throw new GradleException('PLAY_GAMES_APPLICATION_ID must be the numeric Games services project ID.')
+}
+if (gamesWebClientId && !(gamesWebClientId ==~ /[A-Za-z0-9._-]+\.apps\.googleusercontent\.com/)) {
+    throw new GradleException('PLAY_GAMES_WEB_CLIENT_ID must be the public game-server OAuth web client ID.')
+}
+if (gamesLeaderboardId && !(gamesLeaderboardId ==~ /[A-Za-z0-9_-]{1,200}/)) {
+    throw new GradleException('PLAY_GAMES_LEADERBOARD_ID must be a public leaderboard resource ID.')
+}
+
+def uploadEnvironment = ['DHOYO_UPLOAD_STORE_FILE', 'DHOYO_UPLOAD_STORE_PASSWORD',
+                         'DHOYO_UPLOAD_KEY_ALIAS', 'DHOYO_UPLOAD_KEY_PASSWORD']
+def signingProvided = uploadEnvironment.collect { System.getenv(it) ?: '' }
+if (signingProvided.any { it } && !signingProvided.every { it }) {
+    throw new GradleException('Provide all four DHOYO_UPLOAD_* signing environment variables, or leave all unset.')
+}
+
+android {
+    namespace 'com.dhoyo.app'
+    compileSdk 36
+    buildToolsVersion '35.0.0'
+
+    defaultConfig {
+        applicationId 'com.dhoyo.app'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '0.1.0'
+
+        buildConfigField 'String', 'APP_BASE_URL', JsonOutput.toJson(appBaseUrl)
+        buildConfigField 'String', 'PLAY_GAMES_APPLICATION_ID', JsonOutput.toJson(gamesApplicationId)
+        buildConfigField 'String', 'PLAY_GAMES_WEB_CLIENT_ID', JsonOutput.toJson(gamesWebClientId)
+        buildConfigField 'String', 'PLAY_GAMES_LEADERBOARD_ID', JsonOutput.toJson(gamesLeaderboardId)
+        resValue 'string', 'play_games_application_id', gamesApplicationId
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    signingConfigs {
+        if (signingProvided.every { it }) {
+            upload {
+                storeFile file(signingProvided[0])
+                storePassword signingProvided[1]
+                keyAlias signingProvided[2]
+                keyPassword signingProvided[3]
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ''
+        }
+        release {
+            debuggable false
+            minifyEnabled false
+            if (signingProvided.every { it }) {
+                signingConfig signingConfigs.upload
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.browser:browser:1.10.0'
+    implementation 'com.google.android.gms:play-services-games-v2:22.1.0'
+    testImplementation 'junit:junit:4.13.2'
+}

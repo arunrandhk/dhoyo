@@ -1,0 +1,12 @@
+{
+  "stickers": [
+    {"id": "gg", "name": "Good game!", "image": "/static/sportspace/assets/stickers/gg.svg"},
+    {"id": "fire", "name": "On fire!", "image": "/static/sportspace/assets/stickers/fire.svg"},
+    {"id": "trophy", "name": "MVP trophy", "image": "/static/sportspace/assets/stickers/trophy.svg"},
+    {"id": "wave", "name": "Hey teammate!", "image": "/static/sportspace/assets/stickers/wave.svg"},
+    {"id": "heart", "name": "Much love", "image": "/static/sportspace/assets/stickers/heart.svg"},
+    {"id": "football", "name": "Let’s play!", "image": "/static/sportspace/assets/stickers/football.svg"},
+    {"id": "star", "name": "You’re a star!", "image": "/static/sportspace/assets/stickers/star.svg"},
+    {"id": "fist-bump", "name": "Fist bump", "image": "/static/sportspace/assets/stickers/fist-bump.svg"}
+  ]
+}

@@ -106,6 +106,9 @@ jobs:
     needs: push-image
     environment: production
     steps:
+      - name: Get the deployment scripts
+        uses: actions/checkout@v4
+
       - name: Configure AWS
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -119,34 +122,26 @@ jobs:
           INSTANCE_1: ${{ secrets.EC2_INSTANCE_1 }}
           INSTANCE_2: ${{ secrets.EC2_INSTANCE_2 }}
         run: |
+          python3 scripts/build_deploy_parameters.py \
+            --output "$RUNNER_TEMP/deploy-parameters.json"
+
           COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
             --instance-ids "$INSTANCE_1" "$INSTANCE_2" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands="[
-              \"aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $(echo $IMAGE | cut -d/ -f1)\",
-              \"docker pull $IMAGE\",
-              \"SECRET_JSON=\$(aws secretsmanager get-secret-value --secret-id $SECRET_NAME --region $AWS_REGION --query SecretString --output text)\",
-              \"DB_HOST=\$(echo \$SECRET_JSON | jq -r '.host')\",
-              \"DB_PORT=\$(echo \$SECRET_JSON | jq -r '.port')\",
-              \"DB_NAME=\$(echo \$SECRET_JSON | jq -r '.dbname')\",
-              \"DB_USER=\$(echo \$SECRET_JSON | jq -r '.username')\",
-              \"DB_PASSWORD=\$(echo \$SECRET_JSON | jq -r '.password')\",
-              \"docker stop byte-app || true\",
-              \"docker rm byte-app || true\",
-              \"docker run -d --name byte-app --restart unless-stopped -p 8080:8080 -e DB_HOST=\$DB_HOST -e DB_PORT=\$DB_PORT -e DB_NAME=\$DB_NAME -e DB_USER=\$DB_USER -e DB_PASSWORD=\$DB_PASSWORD $IMAGE\",
-              \"sleep 10\",
-              \"curl --fail http://localhost:8080/health\"
-            ]" \
+            --parameters "file://$RUNNER_TEMP/deploy-parameters.json" \
             --query "Command.CommandId" \
             --output text)
 
           echo "Deployment command: $COMMAND_ID"
 
           aws ssm wait command-executed \
+            --region "$AWS_REGION" \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_1"
 
           aws ssm wait command-executed \
+            --region "$AWS_REGION" \
             --command-id "$COMMAND_ID" \
             --instance-id "$INSTANCE_2"
 

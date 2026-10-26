@@ -12,9 +12,10 @@ Browser → HTTPS on Render → Flask/Gunicorn → PostgreSQL on Neon
 ```
 
 The repository already contains the application Dockerfile. The new
-[`render.yaml`](../render.yaml) supplies Render's service settings, asks for your
-database credentials, and initializes the existing `users` table before starting
-Gunicorn. Social and arena state is seeded automatically on first use.
+[`render.yaml`](../render.yaml) supplies Render's service settings and asks for
+your database credentials. The Dockerfile runs [`app/start.sh`](../app/start.sh)
+to initialize the existing `users` table before starting Gunicorn. Social and
+arena state is seeded automatically on first use.
 
 You need a GitHub account with this repository, a Render account, and a Neon
 account. The account setup and database credentials must be completed in those
@@ -33,7 +34,7 @@ that deployment. Run these commands yourself from the repository root:
 ```bash
 git switch -c free-hosting
 git add render.yaml docs/free-hosting.md docs/sportspace-database.md
-git add app/Dockerfile app/.dockerignore app/requirements.txt
+git add app/Dockerfile app/start.sh app/.dockerignore app/requirements.txt
 git add app/app.py app/db.py app/social.py app/arena.py
 git add app/static app/tests/*.py
 git diff --cached --stat
@@ -102,13 +103,51 @@ Leave `SPORTSPACE_SOCIAL_DB` **unset** so social and arena data use PostgreSQL.
 
 The Blueprint sets the Docker context to `app`, the Dockerfile to
 `app/Dockerfile`, and the health check to `/health`. It runs table initialization
-at service startup because the normal Gunicorn command does not execute the
+through the Dockerfile's startup script because Gunicorn does not execute the
 `if __name__ == "__main__"` block in `app.py`.
 [Render Blueprint reference](https://render.com/docs/blueprint-spec).
 
 Keep credentials in Render's environment settings. No secrets belong in
 `render.yaml`. Render builds the image directly from this repository.
 [Docker on Render](https://render.com/docs/docker).
+
+### If you selected New Web Service instead
+
+The **New Web Service** form uses manual settings. Enter the following values:
+
+| Field | Value |
+| --- | --- |
+| Name | `byte-devops` (or another available name) |
+| Language | `Docker` |
+| Branch | `free-hosting` |
+| Region | `Singapore` |
+| Root Directory | `app` |
+| Compute | `Free` |
+
+Add the seven environment variables listed in step 2, using your actual Neon
+connection details for the four `DB_*` credentials. Create the Neon database
+before deploying if you have not already done so.
+
+Expand **Advanced** and set:
+
+| Field | Value |
+| --- | --- |
+| Dockerfile Path | `./Dockerfile` |
+| Docker Build Context Directory (if shown) | `.` |
+| Health Check Path | `/health` |
+| Docker Command | Leave empty to use the Dockerfile's startup script |
+
+These Docker paths are relative to the selected `app` root directory.
+[Render root-directory settings](https://render.com/docs/monorepo-support).
+If you previously entered a command, clear it in the service's **Settings →
+Build & Deploy → Docker Command** field. The Dockerfile now invokes
+`/bin/sh /app/start.sh`, which initializes the users table and starts Gunicorn.
+It listens on `PORT` (default `8080`) and uses `WEB_CONCURRENCY` workers
+(default `2`; Render can set `1` for its Free service).
+
+Click **Deploy web service** after entering all database values. Continue to step 4 once the
+deployment succeeds. The repository's `render.yaml` is used by Blueprint
+deployments; update settings for this manually created service in its dashboard.
 
 ## 4. Open and verify the website
 
@@ -126,15 +165,16 @@ Check the deployment from a terminal, replacing the example hostname:
 ```bash
 curl --fail --show-error https://YOUR-SERVICE.onrender.com/health
 curl --fail --show-error https://YOUR-SERVICE.onrender.com/health/db
-curl --fail --show-error https://YOUR-SERVICE.onrender.com/users
-curl --fail --show-error https://YOUR-SERVICE.onrender.com/api/social/feed
-curl --fail --show-error https://YOUR-SERVICE.onrender.com/api/arena
+curl --show-error --include https://YOUR-SERVICE.onrender.com/api/friends
 ```
 
-Expected results: healthy process, connected database, a users response, and
-JSON containing the social feed and arena state. Open `/ring` in your browser,
-edit the demo profile or create a test post, then reload to check persistence.
-All visitors use the same demo identity, so those changes are shared.
+Expected results: healthy process, connected database, and a `401` sign-in response
+from `/api/friends` without a session. A `404` means the friend routes are not
+deployed. Open `/ring`, register two separate accounts, send and accept a friend
+request, then reload to check persistence. Test **Edit profile → Who can see your
+photos? → Friends only** with a third account that is not a friend.
+Configure email delivery using [password-reset.md](password-reset.md) to test
+Forgot password with an actual email verification code.
 
 ## 5. Publish future changes
 
@@ -178,14 +218,15 @@ you separately remove them. Do not run Terraform for this free-hosting setup.
 
 - Social posts, player profiles, avatars, awards, and arena state live in Neon.
 - Bookings and tournament registration demos remain in each browser's storage.
-- Visitors share one demo identity; separate authenticated accounts and real
-  booking or payment workflows are not implemented.
+- Visitors register separate authenticated accounts, send and accept friend
+  requests, and restrict their photos to accepted friends. Real booking and
+  payment workflows are not implemented.
 - Avatars are stored as image data in PostgreSQL. Other demo images load from
   external URLs.
 
-Keep this as a public demonstration. The shared identity and demo organizer
-actions need real authentication and authorization before serving real users.
-See [the website README](../app/static/sportspace/README.md) and
+Sample match and award content remains a demonstration. Player accounts cannot
+use the demo organizer actions. See
+[the website README](../app/static/sportspace/README.md) and
 [the current database design](sportspace-database.md).
 
 ## Troubleshooting
@@ -199,7 +240,8 @@ See [the website README](../app/static/sportspace/README.md) and
 | Website assets return 404 | Commit and push `app/static`, including all CSS, JS, and icons. |
 | Database connection targets localhost | Configure all `DB_*` variables; `DATABASE_URL` alone is ignored. |
 | SSL or connection error | Verify the Neon hostname, raw password, database, role, and `PGSSLMODE=require`; inspect Render logs. |
-| `relation "users" does not exist` | Ensure the Blueprint's Docker command is applied so initialization runs. |
+| A whole quoted startup command ends with `not found` | Push the updated Dockerfile and `app/start.sh`, then clear Render's Docker Command override and redeploy. |
+| `relation "users" does not exist` | Clear any old Docker Command override so the Dockerfile runs `start.sh` and initializes the table. |
 | Data disappears after a restart | Remove `SPORTSPACE_SOCIAL_DB`; it selects local SQLite instead of Neon. |
 | `/health` passes but social features fail | Check `/health/db` and the API endpoints; `/health` tests only the process. |
 | Startup reports a database timeout | Check Neon status and credentials; retry the deploy after the database wakes. |
@@ -210,7 +252,7 @@ stored outside the repository:
 
 ```bash
 docker build -t byte-ring-demo ./app
-docker run --rm --env-file /path/to/private/database.env -e PORT=8080 -p 8080:8080 byte-ring-demo /bin/sh -c 'python -c "from db import initialize_database; initialize_database()" && exec gunicorn --bind "0.0.0.0:${PORT:-8080}" --workers 2 --access-logfile - --error-logfile - app:app'
+docker run --rm --env-file /path/to/private/database.env -e PORT=8080 -p 8080:8080 byte-ring-demo
 ```
 
 The private environment file should contain the `DB_*` values and

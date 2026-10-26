@@ -1,4 +1,6 @@
 Flask==3.1.2
+PyJWT==2.15.1
+cryptography==50.0.2
 gunicorn==23.0.0
 psycopg2-binary==2.9.10
 pytest==8.4.1
